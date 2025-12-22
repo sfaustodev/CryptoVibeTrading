@@ -1,0 +1,934 @@
+<!DOCTYPE html>
+<html lang="pt-PT" class="scroll-smooth">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Crypto Vibe Trade</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
+    <!-- Font Awesome for Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Markdown Parser for AI responses -->
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        rust: '#DEA584',         
+                        solanaGreen: '#14F195',
+                        solanaPurple: '#9945FF',
+                        bitcoinOrange: '#F7931A',
+                        zcashGold: '#F5B700',
+                        darkBg: '#050505',
+                        panelBg: '#121212',
+                        ichimokuCloud: 'rgba(20, 241, 149, 0.15)',
+                        danger: '#EF4444'
+                    },
+                    fontFamily: {
+                        mono: ['ui-monospace', 'SFMono-Regular', 'Menlo', 'Monaco', 'Consolas', "Liberation Mono", "Courier New", 'monospace'],
+                    },
+                    animation: {
+                        'pulse-slow': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+                        'float': 'float 6s ease-in-out infinite',
+                        'scan': 'scan 4s linear infinite',
+                    },
+                    keyframes: {
+                        float: {
+                            '0%, 100%': { transform: 'translateY(0)' },
+                            '50%': { transform: 'translateY(-10px)' },
+                        },
+                        scan: {
+                            '0%': { transform: 'translateY(-100%)' },
+                            '100%': { transform: 'translateY(100%)' }
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        .chart-container {
+            position: relative;
+            width: 100%;
+            height: 400px;
+            background: #0d0d0d;
+            border-radius: 0.5rem;
+            border: 1px solid #1f1f1f;
+            overflow: hidden;
+        }
+
+        /* Efeito de Scanline no gráfico para parecer terminal antigo/hacker */
+        .chart-scanline::after {
+            content: "";
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(to bottom, transparent 50%, rgba(0, 0, 0, 0.1) 51%);
+            background-size: 100% 4px;
+            pointer-events: none;
+            z-index: 10;
+        }
+        
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #1a1a1a; 
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #333; 
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #9945FF; 
+        }
+
+        .typing-dot {
+            animation: typing 1.4s infinite ease-in-out both;
+        }
+        .typing-dot:nth-child(1) { animation-delay: -0.32s; }
+        .typing-dot:nth-child(2) { animation-delay: -0.16s; }
+        
+        @keyframes typing {
+            0%, 80%, 100% { transform: scale(0); }
+            40% { transform: scale(1); }
+        }
+        
+        .asset-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 40px -10px rgba(153, 69, 255, 0.2);
+        }
+
+        /* Solana Neon Glow for Disclaimer */
+        .neon-disclaimer {
+            background: linear-gradient(135deg, #9945FF 0%, #14F195 50%, #F7931A 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            filter: drop-shadow(0 0 10px rgba(153,69,255,0.6)) drop-shadow(0 0 20px rgba(20,241,149,0.4));
+            animation: neon-glow 2s ease-in-out infinite alternate;
+        }
+        @keyframes neon-glow {
+            from { filter: drop-shadow(0 0 10px rgba(153,69,255,0.6)) drop-shadow(0 0 20px rgba(20,241,149,0.4)); }
+            to { filter: drop-shadow(0 0 20px rgba(153,69,255,0.8)) drop-shadow(0 0 30px rgba(20,241,149,0.6)); }
+        }
+
+        /* Wallet Connected State */
+        .wallet-connected {
+            background: linear-gradient(135deg, #14F195, #14F195) !important;
+            color: #000 !important;
+            box-shadow: 0 0 20px rgba(20,241,149,0.5) !important;
+        }
+    </style>
+</head>
+<body class="bg-darkBg text-gray-200 font-sans antialiased selection:bg-solanaGreen selection:text-black flex flex-col min-h-screen">
+
+    <!-- Navigation -->
+    <nav class="fixed top-0 w-full z-50 bg-darkBg/95 backdrop-blur-xl border-b border-gray-800">
+        <!-- Official Merch Bar - Solana Neon Theme -->
+        <div class="bg-darkBg/95 py-2 px-4 border-b border-gray-900/50 flex justify-center md:justify-between items-center backdrop-blur-sm">
+            <div class="hidden md:flex items-center gap-6 text-xs font-mono text-gray-400 uppercase tracking-wider">
+                <a href="https://shop.x.ai/collections/xai-collection" target="_blank" rel="noopener noreferrer" class="group flex items-center gap-2 hover:text-solanaPurple transition-all duration-300 hover:shadow-[0_0_10px_rgba(153,69,255,0.4)]">
+                    <i class="fa-solid fa-shirt-wrinkled text-gray-500 group-hover:text-solanaPurple"></i>
+                    <span>xAI Merch</span>
+                </a>
+                <a href="https://shop.x.ai/" target="_blank" rel="noopener noreferrer" class="group flex items-center gap-2 hover:text-solanaGreen transition-all duration-300 hover:shadow-[0_0_10px_rgba(20,241,149,0.4)]">
+                    <i class="fa-solid fa-hat-wizard text-gray-500 group-hover:text-solanaGreen"></i>
+                    <span>Grok Shop</span>
+                </a>
+            </div>
+            <span class="text-[11px] text-solanaGreen/80 flex items-center gap-1 font-mono tracking-wider md:hidden">
+                <i class="fa-solid fa-store"></i> Shop
+            </span>
+            <span class="text-solanaGreen flex items-center gap-1 font-mono text-xs">
+                <i class="fa-solid fa-shield-halved"></i> Fenrir ©
+            </span>
+        </div>
+        
+        <div class="container mx-auto px-6 py-3 flex justify-between items-center">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded bg-gradient-to-tr from-solanaPurple to-solanaGreen flex items-center justify-center text-black font-bold animate-pulse-slow shadow-[0_0_15px_rgba(20,241,149,0.5)]">
+                    <i class="fa-solid fa-chart-line text-lg"></i>
+                </div>
+                <div class="flex flex-col">
+                    <span class="font-bold text-xl tracking-tighter leading-none text-white">Crypto Vibe Trade</span>
+                    <span class="text-[9px] text-gray-500 font-mono tracking-widest uppercase mt-0.5">Terminal V.9.0</span>
+                </div>
+            </div>
+            
+            <div class="hidden md:flex gap-8 text-sm font-medium text-gray-400 items-center">
+                <a href="#assets" class="hover:text-solanaGreen transition-colors flex items-center gap-2 text-xs uppercase tracking-wider"><i class="fa-brands fa-bitcoin"></i> Ativos</a>
+                <a href="#ichimoku" class="hover:text-solanaGreen transition-colors flex items-center gap-2 text-xs uppercase tracking-wider"><i class="fa-solid fa-cloud"></i> Ichimoku</a>
+                <a href="#indicators" class="hover:text-solanaGreen transition-colors flex items-center gap-2 text-xs uppercase tracking-wider"><i class="fa-solid fa-wave-square"></i> Osciladores</a>
+                <a href="#ai-analyst" class="text-solanaPurple hover:text-white transition-colors flex items-center gap-2 px-4 py-1.5 rounded-full bg-solanaPurple/10 border border-solanaPurple/20 hover:border-solanaPurple/50 hover:shadow-[0_0_10px_rgba(153,69,255,0.3)]">
+                    <i class="fa-solid fa-brain"></i> IA Analyst
+                </a>
+            </div>
+
+            <div class="flex items-center gap-4">
+                <!-- Wallet Connect Button -->
+                <button id="connect-wallet-btn" onclick="connectWallet()" class="px-4 py-2 bg-solanaGreen/10 hover:bg-solanaGreen/20 text-solanaGreen border-2 border-solanaGreen/30 rounded-lg text-sm font-mono uppercase tracking-wider flex items-center gap-2 transition-all duration-300 hover:shadow-[0_0_20px_rgba(20,241,149,0.3)] hover:border-solanaGreen/50 group">
+                    <i class="fa-solid fa-wallet text-base group-hover:rotate-12"></i>
+                    <span>Connect</span>
+                </button>
+                <div class="hidden lg:flex items-center gap-2 px-3 py-1 bg-gray-900/50 rounded-lg border border-gray-800/50 text-xs font-mono text-solanaGreen/80 shadow-xl backdrop-blur-sm">
+                    <div class="w-1.5 h-1.5 rounded-full bg-solanaGreen animate-pulse"></div>
+                    SOL/USD $148.24
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="container mx-auto px-4 pt-32 pb-20 flex-grow">
+        
+        <!-- Hero Section -->
+        <section class="text-center mb-16 animate-fade-in-up">
+            <h1 class="text-5xl md:text-8xl font-black mb-8 tracking-tighter text-white drop-shadow-[0_0_10px_rgba(255,255,255,0.1)]">
+                Crypto Vibe Trade
+            </h1>
+            <p class="text-lg md:text-xl text-gray-400 max-w-3xl mx-auto mb-12 font-light leading-relaxed border-l-2 border-solanaGreen pl-6 text-left md:text-center md:border-l-0 md:pl-0">
+                Visualize tendências invisíveis com Ichimoku Cloud, Bollinger Bands e Stochastic RSI. <br class="hidden md:block"/>
+                Apoiado por Inteligência Artificial para Bitcoin, Solana e ZCash.
+            </p>
+            
+            <!-- Asset Selector Cards -->
+            <div id="assets" class="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-5xl mx-auto scroll-mt-32">
+                <!-- BTC -->
+                <div onclick="switchAsset('BTC')" class="asset-card p-6 bg-panelBg rounded-xl border border-gray-800 cursor-pointer transition-all group active-asset border-bitcoinOrange/50 relative overflow-hidden">
+                    <div class="absolute -right-4 -top-4 w-24 h-24 bg-bitcoinOrange/10 rounded-full blur-2xl group-hover:bg-bitcoinOrange/20 transition-all"></div>
+                    <div class="flex items-center justify-between mb-4 relative z-10">
+                        <div class="flex items-center gap-3">
+                            <i class="fa-brands fa-bitcoin text-3xl text-bitcoinOrange"></i>
+                            <div>
+                                <h3 class="font-bold text-white text-lg leading-none">Bitcoin</h3>
+                                <span class="text-gray-500 text-[10px] font-mono">CRYPTOCURRENCY</span>
+                            </div>
+                        </div>
+                        <span class="text-bitcoinOrange font-mono text-xs bg-bitcoinOrange/10 px-2 py-1 rounded border border-bitcoinOrange/20">BTC</span>
+                    </div>
+                    <div class="text-3xl font-mono text-gray-200 mb-2 font-bold tracking-tight">$64,230.50</div>
+                    <div class="text-xs text-solanaGreen flex items-center gap-1 font-mono"><i class="fa-solid fa-arrow-trend-up"></i> +2.4% (24h)</div>
+                </div>
+
+                <!-- SOL -->
+                <div onclick="switchAsset('SOL')" class="asset-card p-6 bg-panelBg rounded-xl border border-gray-800 cursor-pointer transition-all group hover:border-solanaGreen/50 relative overflow-hidden">
+                     <div class="absolute -right-4 -top-4 w-24 h-24 bg-solanaGreen/10 rounded-full blur-2xl group-hover:bg-solanaGreen/20 transition-all"></div>
+                    <div class="flex items-center justify-between mb-4 relative z-10">
+                        <div class="flex items-center gap-3">
+                            <i class="fa-solid fa-layer-group text-3xl text-solanaGreen"></i>
+                            <div>
+                                <h3 class="font-bold text-white text-lg leading-none">Solana</h3>
+                                <span class="text-gray-500 text-[10px] font-mono">SMART CONTRACT</span>
+                            </div>
+                        </div>
+                        <span class="text-solanaGreen font-mono text-xs bg-solanaGreen/10 px-2 py-1 rounded border border-solanaGreen/20">SOL</span>
+                    </div>
+                    <div class="text-3xl font-mono text-gray-200 mb-2 font-bold tracking-tight">$148.24</div>
+                    <div class="text-xs text-solanaGreen flex items-center gap-1 font-mono"><i class="fa-solid fa-arrow-trend-up"></i> +5.1% (24h)</div>
+                </div>
+
+                <!-- ZEC -->
+                <div onclick="switchAsset('ZEC')" class="asset-card p-6 bg-panelBg rounded-xl border border-gray-800 cursor-pointer transition-all group hover:border-zcashGold/50 relative overflow-hidden">
+                     <div class="absolute -right-4 -top-4 w-24 h-24 bg-zcashGold/10 rounded-full blur-2xl group-hover:bg-zcashGold/20 transition-all"></div>
+                    <div class="flex items-center justify-between mb-4 relative z-10">
+                        <div class="flex items-center gap-3">
+                            <i class="fa-solid fa-shield-halved text-3xl text-zcashGold"></i>
+                            <div>
+                                <h3 class="font-bold text-white text-lg leading-none">ZCash</h3>
+                                <span class="text-gray-500 text-[10px] font-mono">PRIVACY COIN</span>
+                            </div>
+                        </div>
+                        <span class="text-zcashGold font-mono text-xs bg-zcashGold/10 px-2 py-1 rounded border border-zcashGold/20">ZEC</span>
+                    </div>
+                    <div class="text-3xl font-mono text-gray-200 mb-2 font-bold tracking-tight">$28.45</div>
+                    <div class="text-xs text-danger flex items-center gap-1 font-mono"><i class="fa-solid fa-arrow-trend-down"></i> -0.8% (24h)</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Main Indicator: Ichimoku Cloud -->
+        <section id="ichimoku" class="mb-20 scroll-mt-28">
+            <div class="flex items-center justify-between mb-8">
+                <div class="flex items-center gap-4">
+                    <div class="w-12 h-12 rounded-xl bg-gray-900 flex items-center justify-center text-solanaGreen font-bold text-2xl shadow-lg border border-gray-800">
+                        <i class="fa-solid fa-cloud"></i>
+                    </div>
+                    <div>
+                        <h2 class="text-3xl font-bold text-white tracking-tight">Nuvem de Ichimoku</h2>
+                        <p class="text-sm text-gray-500 font-mono">INDICADOR DE TENDÊNCIA E SUPORTE</p>
+                    </div>
+                </div>
+                <button onclick="askAiAbout('Como interpretar a Nuvem de Ichimoku neste cenário de alta?')" class="hidden md:flex text-xs bg-solanaPurple/10 hover:bg-solanaPurple/20 text-solanaPurple px-6 py-3 rounded-lg border border-solanaPurple/20 transition-all items-center gap-2 hover:shadow-[0_0_15px_rgba(153,69,255,0.2)]">
+                    <i class="fa-solid fa-robot"></i> Analisar com IA
+                </button>
+            </div>
+
+            <div class="grid lg:grid-cols-4 gap-8">
+                <!-- Chart Area -->
+                <div class="lg:col-span-3 bg-panelBg p-1 rounded-xl border border-gray-800 shadow-2xl">
+                    <div class="bg-black/50 p-3 border-b border-gray-800 flex justify-between items-center rounded-t-lg">
+                         <div class="flex items-center gap-2">
+                             <span id="asset-label-ichimoku" class="text-xs font-bold text-white bg-gray-800 px-3 py-1 rounded border border-gray-700">BTC/USD</span>
+                             <span class="text-[10px] text-gray-500 font-mono">1D TIMEFLAME</span>
+                         </div>
+                         <div class="flex gap-4 text-[10px] font-mono uppercase tracking-wider text-gray-400">
+                            <span class="flex items-center gap-1"><span class="w-2 h-0.5 bg-blue-500"></span> Tenkan</span>
+                            <span class="flex items-center gap-1"><span class="w-2 h-0.5 bg-red-500"></span> Kijun</span>
+                            <span class="flex items-center gap-1"><span class="w-2 h-2 rounded bg-green-500/20 border border-green-500/50"></span> Kumo Cloud</span>
+                        </div>
+                    </div>
+                    <div class="chart-container chart-scanline">
+                        <canvas id="ichimokuChart"></canvas>
+                    </div>
+                </div>
+
+                <!-- Info Sidebar -->
+                <div class="bg-gray-900/30 p-6 rounded-xl border border-gray-800 flex flex-col justify-center space-y-8 backdrop-blur-sm">
+                    <div>
+                        <h4 class="text-gray-500 text-[10px] font-bold uppercase tracking-widest mb-2">Estado da Tendência</h4>
+                        <div class="text-3xl font-black text-solanaGreen flex items-center gap-2 tracking-tighter" style="text-shadow: 0 0 10px rgba(20,241,149,0.3)">
+                            BULLISH <i class="fa-solid fa-caret-up"></i>
+                        </div>
+                        <p class="text-xs text-gray-400 mt-2 leading-relaxed">O preço mantém-se acima da Kumo (Nuvem), indicando forte pressão de compra institucional.</p>
+                    </div>
+                    
+                    <div class="h-px bg-gradient-to-r from-transparent via-gray-700 to-transparent"></div>
+
+                    <div>
+                        <h4 class="text-gray-500 text-[10px] font-bold uppercase tracking-widest mb-2">Suporte Chave</h4>
+                        <div class="font-mono text-xl text-white font-bold">$61,400.00</div>
+                        <p class="text-xs text-gray-500 mt-1">Span B (Flat) a atuar como base sólida.</p>
+                    </div>
+
+                    <div class="bg-blue-500/5 p-4 rounded border border-blue-500/10">
+                        <p class="text-xs text-blue-300 leading-relaxed">
+                            <i class="fa-solid fa-circle-info mr-1"></i> 
+                            O cruzamento <strong>TK (Tenkan/Kijun)</strong> é iminente. Aguarde confirmação de volume antes de entrar.
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Secondary Indicators: Bollinger & Stoch -->
+        <section id="indicators" class="mb-20 scroll-mt-28">
+            <div class="flex items-center gap-4 mb-8">
+                <div class="w-12 h-12 rounded-xl bg-gray-900 flex items-center justify-center text-solanaPurple font-bold text-2xl shadow-lg border border-gray-800">
+                    <i class="fa-solid fa-wave-square"></i>
+                </div>
+                <div>
+                    <h2 class="text-3xl font-bold text-white tracking-tight">Osciladores Avançados</h2>
+                    <p class="text-sm text-gray-500 font-mono">VOLATILIDADE & MOMENTUM</p>
+                </div>
+            </div>
+
+            <div class="grid md:grid-cols-2 gap-8">
+                <!-- Bollinger Bands -->
+                <div class="bg-panelBg p-1 rounded-xl border border-gray-800 hover:border-gray-600 transition-colors shadow-lg">
+                    <div class="p-4 border-b border-gray-800 flex justify-between items-center bg-black/40">
+                        <h3 class="font-bold text-gray-200 text-sm uppercase tracking-wider">Bollinger Bands (20, 2)</h3>
+                        <button onclick="askAiAbout('O que significa um Squeeze nas Bollinger Bands?')" class="text-solanaPurple text-xs hover:text-white transition-colors"><i class="fa-solid fa-circle-question"></i> Info</button>
+                    </div>
+                    <div class="chart-container h-[300px] chart-scanline">
+                        <canvas id="bollingerChart"></canvas>
+                    </div>
+                    <div class="p-4 bg-black/40">
+                         <p class="text-xs text-gray-400 text-center font-mono">
+                            STATUS: <span class="text-solanaGreen font-bold animate-pulse">EXPANSÃO</span> • VOLATILIDADE ALTA
+                        </p>
+                    </div>
+                </div>
+
+                <!-- Stochastic RSI -->
+                <div class="bg-panelBg p-1 rounded-xl border border-gray-800 hover:border-gray-600 transition-colors shadow-lg">
+                    <div class="p-4 border-b border-gray-800 flex justify-between items-center bg-black/40">
+                        <h3 class="font-bold text-gray-200 text-sm uppercase tracking-wider">Stoch RSI (14, 14, 3, 3)</h3>
+                        <button onclick="askAiAbout('Como identificar divergências no Stoch RSI?')" class="text-solanaPurple text-xs hover:text-white transition-colors"><i class="fa-solid fa-circle-question"></i> Info</button>
+                    </div>
+                    <div class="chart-container h-[300px] chart-scanline">
+                        <canvas id="stochChart"></canvas>
+                    </div>
+                    <div class="p-4 bg-black/40">
+                        <p class="text-xs text-gray-400 text-center font-mono">
+                           STATUS: <span class="text-bitcoinOrange font-bold">SOBRECOMPRA (>80)</span> • ALERTA DE CORREÇÃO
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- AI Analyst Section -->
+        <section id="ai-analyst" class="mb-20 scroll-mt-28">
+            <div class="flex items-center gap-4 mb-8">
+                <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-solanaPurple to-blue-600 flex items-center justify-center text-white font-bold text-2xl shadow-lg shadow-solanaPurple/20 animate-float">
+                    <i class="fa-solid fa-brain"></i>
+                </div>
+                <div>
+                    <h2 class="text-3xl font-bold text-white tracking-tight">Terminal IA Dedicado</h2>
+                    <p class="text-sm text-gray-500 font-mono">GROK 4 (SERVER) • CONTEXTO: MERCADO CRYPTO</p>
+                </div>
+            </div>
+
+            <div class="bg-panelBg border border-gray-800 rounded-xl overflow-hidden shadow-2xl shadow-solanaPurple/5 relative">
+                <!-- Chat Interface -->
+                <div class="grid lg:grid-cols-3 h-[600px]">
+                    <!-- Sidebar: Suggested Topics -->
+                    <div class="bg-black/50 border-r border-gray-800 p-6 hidden lg:flex flex-col">
+                        <h3 class="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-6">Sinais Rápidos</h3>
+                        <div class="space-y-3 flex-grow">
+                            <button onclick="setAiQuery('Analise a correlação entre a Nuvem de Ichimoku e o RSI atual.')" class="w-full text-left p-4 rounded-lg bg-gray-900 hover:bg-gray-800 border border-gray-800 text-sm text-gray-300 hover:text-white transition-all group">
+                                <div class="flex items-center gap-3 mb-1">
+                                    <i class="fa-solid fa-layer-group text-solanaGreen group-hover:scale-110 transition-transform"></i> 
+                                    <span class="font-bold text-xs uppercase">Confluência</span>
+                                </div>
+                                <span class="text-xs text-gray-500">Ichimoku + RSI Divergence</span>
+                            </button>
+                            
+                            <button onclick="setAiQuery('O que fazer quando o preço rompe a banda superior de Bollinger?')" class="w-full text-left p-4 rounded-lg bg-gray-900 hover:bg-gray-800 border border-gray-800 text-sm text-gray-300 hover:text-white transition-all group">
+                                <div class="flex items-center gap-3 mb-1">
+                                    <i class="fa-solid fa-arrows-left-right-to-line text-blue-400 group-hover:scale-110 transition-transform"></i> 
+                                    <span class="font-bold text-xs uppercase">Breakout</span>
+                                </div>
+                                <span class="text-xs text-gray-500">Estratégia de Rompimento</span>
+                            </button>
+
+                            <button onclick="setAiQuery('Explique a \'Cruz da Morte\' e a \'Cruz Dourada\' em termos simples.')" class="w-full text-left p-4 rounded-lg bg-gray-900 hover:bg-gray-800 border border-gray-800 text-sm text-gray-300 hover:text-white transition-all group">
+                                <div class="flex items-center gap-3 mb-1">
+                                    <i class="fa-solid fa-xmarks-lines text-red-400 group-hover:scale-110 transition-transform"></i> 
+                                    <span class="font-bold text-xs uppercase">Golden Cross</span>
+                                </div>
+                                <span class="text-xs text-gray-500">Médias Móveis 50/200</span>
+                            </button>
+                        </div>
+                        <div class="mt-auto pt-6 border-t border-gray-800">
+                             <div class="flex items-center gap-2 text-xs text-gray-600 font-mono">
+                                <span class="w-2 h-2 rounded-full bg-solanaGreen animate-pulse"></span>
+                                SYSTEM ONLINE
+                             </div>
+                        </div>
+                    </div>
+
+                    <!-- Chat Area -->
+                    <div class="lg:col-span-2 flex flex-col bg-[#050505] relative">
+                        <div class="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-5 pointer-events-none"></div>
+                        
+                        <!-- Messages -->
+                        <div id="ai-chat-output" class="flex-grow p-6 overflow-y-auto custom-scrollbar space-y-6 relative z-10">
+                            <div class="flex gap-4">
+                                <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-solanaPurple to-blue-600 flex items-center justify-center flex-shrink-0 shadow-lg shadow-solanaPurple/20">
+                                    <i class="fa-solid fa-brain text-white text-sm"></i>
+                                </div>
+                                <div class="bg-gray-900 rounded-2xl rounded-tl-none p-5 border border-gray-800 max-w-[85%] shadow-md">
+                                    <p class="text-sm text-gray-300 leading-relaxed">
+                                        Saudações. O meu motor neural está calibrado para os mercados de <strong class="text-white">Bitcoin, Solana e ZCash</strong>.
+                                        <br/><br/>
+                                        Posso calcular níveis de Fibonacci, identificar padrões harmónicos ou explicar o sentimento atual do mercado. O que queres analisar hoje?
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Input -->
+                        <div class="p-6 border-t border-gray-800 bg-panelBg relative z-20">
+                            <div class="relative group">
+                                <div class="absolute -inset-0.5 bg-gradient-to-r from-solanaPurple to-solanaGreen rounded-lg blur opacity-20 group-hover:opacity-40 transition duration-1000"></div>
+                                <input type="text" id="ai-chat-input" placeholder="Pergunte ao Oráculo (Ex: Previsão BTC para o próximo halving...)" class="relative w-full bg-black border border-gray-700 rounded-lg pl-5 pr-14 py-4 text-sm text-white focus:outline-none focus:border-gray-600 transition-colors shadow-inner" onkeypress="handleChatEnter(event)">
+                                <button onclick="sendAiQuery()" class="absolute right-2 top-2 bottom-2 aspect-square bg-gray-800 hover:bg-white hover:text-black text-gray-400 rounded-md transition-all flex items-center justify-center" id="ai-send-btn">
+                                    <i class="fa-solid fa-arrow-up text-sm"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- Footer -->
+    <footer class="bg-black border-t border-gray-900 py-16 text-center relative overflow-hidden">
+        <div class="absolute inset-0 bg-gradient-to-b from-transparent to-gray-900/50 pointer-events-none"></div>
+        <div class="container mx-auto px-4 relative z-10">
+        <!-- Neon Disclaimer -->
+        <div class="neon-disclaimer text-4xl md:text-6xl font-black tracking-[0.05em] uppercase mb-12 text-center leading-tight">
+            ISTO NÃO É CONSSELHO FINANCEIRO
+        </div>
+        <h2 class="text-3xl md:text-5xl font-black text-white mb-6 tracking-widest uppercase opacity-80" style="font-family: 'Courier New', Courier, monospace;">
+            Nao damos dicas de investimento.
+        </h2>
+            <div class="text-6xl md:text-9xl font-black text-gray-800 mb-8 tracking-[0.2em] opacity-30 select-none">
+                D.Y.O.R.
+            </div>
+            <p class="text-xl md:text-2xl text-gray-500 font-serif italic mb-12">
+                "Do Your Own Research." <br/> <span class="text-sm not-italic font-mono text-gray-600 mt-2 block">- 'Nakamoto, Satoshi'</span>
+            </p>
+            
+            <div class="h-px w-24 bg-gray-800 mx-auto mb-8"></div>
+            
+            <p class="text-[10px] text-gray-700 font-mono uppercase tracking-widest">
+                Protected by Fenrir © 2024 • Secure Connection
+            </p>
+            <!-- Thanks Grok Link -->
+            <div class="mt-12 pt-8 border-t border-gray-800/50">
+                <a href="https://grok.x.ai/" target="_blank" rel="noopener noreferrer" class="block text-xl md:text-2xl font-bold text-solanaGreen hover:text-solanaGreen/90 transition-all duration-300 underline decoration-2 underline-offset-4 decoration-solanaGreen/50 group hover:decoration-solanaGreen hover:scale-105">
+                    Thanks Grok! 
+                    <i class="fa-solid fa-arrow-up-right-from-square inline-block ml-2 group-hover:translate-x-1 transition-transform"></i>
+                </a>
+                <p class="text-xs text-gray-600 mt-4 font-mono tracking-wider opacity-75">
+                    SuperGrok & xAI — Understand the Universe 🚀
+                </p>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Scripts -->
+    <script>
+        // AI Backend Configuration
+        // IMPORTANT: Never put provider API keys in the browser.
+        // This page calls your own server endpoint, and the server talks to Grok/Gemini/etc.
+        const aiEndpoint = "/api/ai";
+
+        // Global State
+        let currentAsset = 'BTC';
+        
+        // --- Enhanced Data Generator (Random Walk) ---
+        // Generates realistic-looking market data with trends and noise
+        function generateRandomWalk(points, startPrice, volatility) {
+            let data = [startPrice];
+            let currentPrice = startPrice;
+            for (let i = 1; i < points; i++) {
+                // Random drift (-0.5 to 0.5) + volatility multiplier
+                let change = (Math.random() - 0.5) * volatility; 
+                // Add some trend bias occasionally
+                if (Math.random() > 0.95) change *= 5; // Shock
+                
+                currentPrice += change;
+                if(currentPrice < 0) currentPrice = 0.01;
+                data.push(currentPrice);
+            }
+            return data;
+        }
+
+        const labels = Array.from({length: 100}, (_, i) => i);
+        
+        // --- 1. Ichimoku Chart Config (Improved Styling) ---
+        function initIchimoku(asset) {
+            const ctx = document.getElementById('ichimokuChart').getContext('2d');
+            
+            const startPrice = asset === 'BTC' ? 64000 : (asset === 'SOL' ? 148 : 28);
+            const volatility = asset === 'BTC' ? 800 : (asset === 'SOL' ? 3 : 0.8);
+            
+            const prices = generateRandomWalk(100, startPrice, volatility);
+            
+            // Lagging and shifted calculations for cloud simulation
+            const tenkan = prices.map((p, i) => {
+                let slice = prices.slice(Math.max(0, i-9), i+1);
+                return (Math.min(...slice) + Math.max(...slice)) / 2;
+            });
+            const kijun = prices.map((p, i) => {
+                let slice = prices.slice(Math.max(0, i-26), i+1);
+                return (Math.min(...slice) + Math.max(...slice)) / 2;
+            });
+            
+            // Clouds (Shifted forward visually by just offseting arrays or simplifying for visual effect)
+            const spanA = prices.map((p, i) => (tenkan[i] + kijun[i])/2 + (Math.random()*volatility*0.2));
+            const spanB = prices.map((p, i) => kijun[i] + (Math.random()*volatility*0.5));
+
+            if (window.ichimokuChartInstance) window.ichimokuChartInstance.destroy();
+
+            window.ichimokuChartInstance = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [
+                        {
+                            label: 'Price',
+                            data: prices,
+                            borderColor: '#ffffff',
+                            borderWidth: 2,
+                            tension: 0.1,
+                            pointRadius: 0,
+                            z: 10
+                        },
+                        {
+                            label: 'Tenkan',
+                            data: tenkan,
+                            borderColor: '#3b82f6', // Blue
+                            borderWidth: 1,
+                            pointRadius: 0,
+                        },
+                        {
+                            label: 'Kijun',
+                            data: kijun,
+                            borderColor: '#ef4444', // Red
+                            borderWidth: 1,
+                            pointRadius: 0,
+                        },
+                        {
+                            label: 'Cloud Top',
+                            data: spanA,
+                            borderColor: 'transparent',
+                            pointRadius: 0,
+                            fill: '+1', // Fill to next dataset
+                            backgroundColor: 'rgba(20, 241, 149, 0.15)' // Green cloud
+                        },
+                        {
+                            label: 'Cloud Bottom',
+                            data: spanB,
+                            borderColor: 'transparent',
+                            pointRadius: 0,
+                            backgroundColor: 'transparent'
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        x: { display: false },
+                        y: { 
+                            position: 'right',
+                            grid: { color: '#1f1f1f' },
+                            ticks: { color: '#666', font: {family: 'monospace'} } 
+                        }
+                    },
+                    animation: { duration: 1500, easing: 'easeOutQuart' },
+                    interaction: {
+                        mode: 'index',
+                        intersect: false,
+                    },
+                }
+            });
+        }
+
+        // --- 2. Bollinger Chart Config (Improved) ---
+        function initBollinger(asset) {
+            const ctx = document.getElementById('bollingerChart').getContext('2d');
+            const startPrice = asset === 'BTC' ? 64000 : (asset === 'SOL' ? 148 : 28);
+            const volatility = asset === 'BTC' ? 500 : (asset === 'SOL' ? 2 : 0.5);
+            
+            const prices = generateRandomWalk(80, startPrice, volatility);
+            
+            // Simple BB calculation simulation
+            const ma = prices.map((p, i, arr) => {
+                let start = Math.max(0, i-20);
+                let subset = arr.slice(start, i+1);
+                return subset.reduce((a,b)=>a+b,0)/subset.length;
+            });
+            
+            // Artificially create squeeze and expansion
+            const upper = ma.map((p, i) => p + (volatility * 2 * (1 + Math.sin(i/10)*0.5)));
+            const lower = ma.map((p, i) => p - (volatility * 2 * (1 + Math.sin(i/10)*0.5)));
+
+            if (window.bollingerChartInstance) window.bollingerChartInstance.destroy();
+
+            window.bollingerChartInstance = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels.slice(0, 80),
+                    datasets: [
+                        {
+                            label: 'Upper',
+                            data: upper,
+                            borderColor: 'rgba(20, 241, 149, 0.5)',
+                            borderWidth: 1,
+                            pointRadius: 0,
+                            fill: false
+                        },
+                        {
+                            label: 'Lower',
+                            data: lower,
+                            borderColor: 'rgba(20, 241, 149, 0.5)',
+                            borderWidth: 1,
+                            pointRadius: 0,
+                            fill: '-1', // Fill to Upper
+                            backgroundColor: 'rgba(20, 241, 149, 0.05)'
+                        },
+                        {
+                            label: 'Price',
+                            data: prices,
+                            borderColor: '#fff',
+                            borderWidth: 1.5,
+                            pointRadius: 0
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: { x: { display: false }, y: { display: false } },
+                    animation: { duration: 1500 }
+                }
+            });
+        }
+
+        // --- 3. Stoch RSI Chart Config (Improved) ---
+        function initStoch(asset) {
+            const ctx = document.getElementById('stochChart').getContext('2d');
+            // Generate oscillating data
+            let kLine = [];
+            let val = 50;
+            for(let i=0; i<80; i++) {
+                val += (Math.random()-0.5) * 20;
+                if(val > 100) val = 100;
+                if(val < 0) val = 0;
+                kLine.push(val);
+            }
+            // Smooth for D line
+            const dLine = kLine.map((v, i, arr) => {
+                 if(i<3) return v;
+                 return (arr[i] + arr[i-1] + arr[i-2])/3;
+            });
+
+            if (window.stochChartInstance) window.stochChartInstance.destroy();
+
+            window.stochChartInstance = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels.slice(0, 80),
+                    datasets: [
+                        {
+                            label: '%K',
+                            data: kLine,
+                            borderColor: '#3b82f6',
+                            borderWidth: 1.5,
+                            pointRadius: 0
+                        },
+                        {
+                            label: '%D',
+                            data: dLine,
+                            borderColor: '#F7931A',
+                            borderWidth: 1.5,
+                            pointRadius: 0
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        x: { display: false },
+                        y: { 
+                            min: 0, max: 100,
+                            grid: { color: '#333', borderDash: [2, 2] },
+                            ticks: { display: false }
+                        }
+                    },
+                    animation: { duration: 1500 }
+                }
+            });
+        }
+
+        // --- Asset Switching Logic ---
+        function switchAsset(asset) {
+            currentAsset = asset;
+            document.querySelectorAll('.asset-card').forEach(el => {
+                el.classList.remove('border-solanaGreen', 'ring-1', 'ring-solanaGreen', 'bg-gray-900');
+                el.classList.add('bg-panelBg');
+            });
+            
+            // Highlight active
+            const activeCard = event.currentTarget;
+            activeCard.classList.remove('bg-panelBg');
+            activeCard.classList.add('bg-gray-900', 'border-solanaGreen');
+            
+            document.getElementById('asset-label-ichimoku').innerText = `${asset}/USD`;
+            
+            initIchimoku(asset);
+            initBollinger(asset);
+            initStoch(asset);
+        }
+
+        // Initialize Default
+        window.onload = () => {
+            initIchimoku('BTC');
+            initBollinger('BTC');
+            initStoch('BTC');
+        };
+
+
+        // --- AI INTEGRATION (SERVER-BACKED) ---
+
+        async function callAi(prompt, systemInstruction = "") {
+            const payload = {
+                prompt,
+                systemInstruction,
+                asset: currentAsset,
+            };
+
+            try {
+                const response = await fetch(aiEndpoint, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(payload),
+                });
+
+                if (!response.ok) {
+                    const text = await response.text().catch(() => "");
+                    throw new Error(`AI Backend Error: ${response.status} ${text}`);
+                }
+
+                const data = await response.json();
+                return data?.text || "Análise indisponível no momento.";
+            } catch (error) {
+                console.error("AI Backend Error:", error);
+                return "Erro de conexão com o Terminal IA.";
+            }
+        }
+
+        function setAiQuery(query) {
+            const input = document.getElementById('ai-chat-input');
+            input.value = query;
+            input.focus();
+        }
+
+        function askAiAbout(query) {
+            document.getElementById('ai-analyst').scrollIntoView({ behavior: 'smooth' });
+            setAiQuery(query);
+            setTimeout(sendAiQuery, 500); // Auto send for buttons
+        }
+
+        function handleChatEnter(event) {
+            if (event.key === 'Enter') sendAiQuery();
+        }
+
+        async function connectWallet() {
+            const btn = document.getElementById('connect-wallet-btn');
+            if (typeof window.solana !== 'undefined') {
+                try {
+                    btn.disabled = true;
+                    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1"></i>Connecting...';
+                    const resp = await window.solana.connect({ onlyIfTrusted: false });
+                    const payload = { 
+                        publicKey: resp.publicKey.toString(),
+                        label: resp.label || 'Unknown'
+                    };
+                    const response = await fetch('/api/wallet/connect', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload),
+                    });
+                    if (response.ok) {
+                        const data = await response.json();
+                        btn.innerHTML = `<i class="fa-solid fa-check-circle text-solanaGreen mr-1"></i>Connected (${data.publicKey?.slice(0,4)}...${data.publicKey?.slice(-4)})`;
+                        btn.classList.add('wallet-connected');
+                        btn.onclick = disconnectWallet;
+                    } else {
+                        throw new Error('Backend error');
+                    }
+                } catch (err) {
+                    console.error('Wallet error:', err);
+                    alert('Connection failed. Ensure Phantom is installed and unlocked.');
+                    btn.innerHTML = '<i class="fa-solid fa-wallet text-base group-hover:rotate-12"></i> <span>Connect</span>';
+                    btn.disabled = false;
+                }
+            } else {
+                alert('Solana wallet (Phantom) not found. Install from https://phantom.app');
+            }
+        }
+
+        async function disconnectWallet() {
+            const btn = document.getElementById('connect-wallet-btn');
+            try {
+                await window.solana.disconnect();
+                btn.innerHTML = '<i class="fa-solid fa-wallet text-base"></i> <span>Connect</span>';
+                btn.classList.remove('wallet-connected');
+                btn.onclick = connectWallet;
+                btn.disabled = false;
+            } catch (err) {
+                console.error('Disconnect error:', err);
+            }
+        }
+
+        // Auto-connect if trusted
+        if (typeof window.solana !== 'undefined') {
+            window.solana.on('connect', () => {
+                // Handle auto-connect
+                connectWallet();
+            });
+        }
+
+        async function sendAiQuery() {
+            const inputEl = document.getElementById('ai-chat-input');
+            const outputEl = document.getElementById('ai-chat-output');
+            const btnEl = document.getElementById('ai-send-btn');
+            const query = inputEl.value.trim();
+
+            if (!query) return;
+
+            // User Message
+            outputEl.innerHTML += `
+                <div class="flex gap-4 flex-row-reverse animate-fade-in-up">
+                    <div class="w-8 h-8 rounded-full bg-gray-700 flex items-center justify-center flex-shrink-0 border border-gray-600">
+                        <i class="fa-solid fa-user text-xs"></i>
+                    </div>
+                    <div class="bg-solanaPurple/10 rounded-2xl rounded-tr-none p-4 border border-solanaPurple/20 max-w-[85%] backdrop-blur-sm">
+                        <p class="text-sm text-white">${query}</p>
+                    </div>
+                </div>
+            `;
+            
+            inputEl.value = '';
+            outputEl.scrollTop = outputEl.scrollHeight;
+            btnEl.disabled = true;
+            btnEl.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
+
+            // Loading
+            const loadingId = 'loading-' + Date.now();
+            outputEl.innerHTML += `
+                <div id="${loadingId}" class="flex gap-4 animate-fade-in-up">
+                    <div class="w-8 h-8 rounded-full bg-solanaPurple/20 flex items-center justify-center flex-shrink-0 border border-solanaPurple/30">
+                        <i class="fa-solid fa-robot text-solanaPurple text-xs"></i>
+                    </div>
+                    <div class="bg-gray-900 rounded-2xl rounded-tl-none p-4 border border-gray-800 max-w-[80%] flex items-center gap-1">
+                        <div class="w-1.5 h-1.5 bg-gray-500 rounded-full typing-dot"></div>
+                        <div class="w-1.5 h-1.5 bg-gray-500 rounded-full typing-dot"></div>
+                        <div class="w-1.5 h-1.5 bg-gray-500 rounded-full typing-dot"></div>
+                    </div>
+                </div>
+            `;
+            outputEl.scrollTop = outputEl.scrollHeight;
+
+            // System Instruction: TRADING EXPERT
+            const systemPrompt = `Você é um Analista Técnico Sênior (Persona: Fenrir AI). Especializado em Bitcoin, Solana e ZCash.
+            Contexto atual: Ativo selecionado é ${currentAsset}.
+            Estilo: Profissional, direto, usando termos de Wall Street e Análise Técnica (RSI, MACD, Fibonacci, Ichimoku).
+            Objetivo: Explicar o cenário técnico ou responder dúvidas sobre trading.
+            Aviso: Sempre termine com um lembrete sutil de DYOR (Do Your Own Research).
+            Idioma: Português (Portugal).`;
+
+            const response = await callAi(query, systemPrompt);
+            const formattedResponse = marked.parse(response);
+
+            document.getElementById(loadingId).remove();
+            outputEl.innerHTML += `
+                <div class="flex gap-4 animate-fade-in-up">
+                    <div class="w-8 h-8 rounded-full bg-solanaPurple/20 flex items-center justify-center flex-shrink-0 border border-solanaPurple/30">
+                        <i class="fa-solid fa-robot text-solanaPurple text-xs"></i>
+                    </div>
+                    <div class="bg-gray-900/80 rounded-2xl rounded-tl-none p-5 border border-gray-800 max-w-[90%] prose prose-invert prose-sm shadow-xl">
+                        ${formattedResponse}
+                    </div>
+                </div>
+            `;
+
+            outputEl.scrollTop = outputEl.scrollHeight;
+            btnEl.disabled = false;
+            btnEl.innerHTML = '<i class="fa-solid fa-arrow-up text-sm"></i>';
+        }
+    </script>
+</body>
+</html>
+Fazer um upgrade para o SuperGrok
+Crypto Vibe Trade - Grok
+Arquivos no seu projeto serão automaticamente adicionados a esta conversa.
