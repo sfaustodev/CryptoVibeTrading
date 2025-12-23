@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Crypto Vibe Trade</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.js"></script>
     <!-- Font Awesome for Icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <!-- Markdown Parser for AI responses -->
@@ -493,7 +493,7 @@
         // AI Backend Configuration
         // IMPORTANT: Never put provider API keys in the browser.
         // This page calls your own server endpoint, and the server talks to Grok/Gemini/etc.
-        const aiEndpoint = "/api/ai";
+        const aiEndpoint = "/api/AiAnalyze";
 
         // Global State
         let currentAsset = 'BTC';

@@ -1,15 +1,15 @@
 [package]
 name = "cvt"
 version = "0.1.0"
-edition = "2024"
+edition = "2021"
 
 [dependencies]
-leptos = { version = "0.7", default-features = false, features = ["ssr"] }
-leptos_axum = { version = "0.7" }
-leptos_meta = { version = "0.7" }
-server_fn = "0.7"
+leptos = { version = "0.6", default-features = false, features = ["ssr"] }
+leptos_axum = { version = "0.6" }
+leptos_meta = { version = "0.6" }
+server_fn = "0.6"
 
-axum = { version = "0.7", features = ["json"] }
+axum = { version = "0.6", features = ["json"] }
 tokio = { version = "1", features = ["rt-multi-thread", "macros"] }
 reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
 

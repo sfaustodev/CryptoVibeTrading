@@ -1,9 +1,9 @@
 #![forbid(unsafe_code)]
 
-use leptos::prelude::*;
+use leptos::prelude::*;\nuse leptos::{view, component, server, IntoView};\nuse leptos::ServerFnError;
 use leptos_meta::*;
 use serde::{Deserialize, Serialize};
-use server_fn::error::NoCustomError;
+
 
 // =====================
 // Shared API types
@@ -32,8 +32,8 @@ pub async fn ai_analyze(
 ) -> Result<String, ServerFnError<NoCustomError>> {
     use std::env;
 
-    let api_key = env::var("XAI_API_KEY")
-        .map_err(|_| ServerFnError::ServerError("Missing XAI_API_KEY env var".to_string()))?;
+    let api_key = env::var("GROK_API_KEY")
+        .map_err(|_| ServerFnError::server_error("Missing GROK_API_KEY env var".to_string()))?;
 
     let base_url = env::var("XAI_BASE_URL").unwrap_or_else(|_| "https://api.x.ai/v1".to_string());
     let model = env::var("XAI_MODEL").unwrap_or_else(|_| "grok-4".to_string());
@@ -79,7 +79,7 @@ pub async fn ai_analyze(
         .json(&body)
         .send()
         .await
-        .map_err(|e| ServerFnError::ServerError(format!("network error: {e}")))?;
+        .map_err(|e| ServerFnError::server_error(format!("network error: {e}")))?;
 
     if !resp.status().is_success() {
         let status = resp.status();
@@ -105,7 +105,7 @@ pub async fn ai_analyze(
     let parsed = resp
         .json::<ChatResp>()
         .await
-        .map_err(|e| ServerFnError::ServerError(format!("decode error: {e}")))?;
+        .map_err(|e| ServerFnError::server_error(format!("decode error: {e}")))?;
 
     Ok(parsed
         .choices
@@ -287,7 +287,7 @@ fn AiTerminal() -> impl IntoView {
         if let Some(result) = send.value().get() {
             match result {
                 Ok(text) => set_messages.update(|m| m.push((false, text))),
-                Err(e) => set_messages.update(|m| m.push((false, format!("Erro do backend: {e}. DYOR.")))),
+                Err(e) => set_messages.update(|m| m.push((false, format!(\"Erro do backend: {e}. DYOR.\")))),
             }
         }
     });
@@ -371,7 +371,7 @@ fn AiTerminal() -> impl IntoView {
 
 #[tokio::main]
 async fn main() {
-    use axum::{routing::post, Router};
+    use axum::{Router, routing::{post, fallback}, http::StatusCode, response::IntoResponse};
     use leptos_axum::{generate_route_list, LeptosRoutes};
     use std::net::SocketAddr;
     use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
@@ -383,13 +383,13 @@ async fn main() {
         .with(tracing_subscriber::fmt::layer())
         .init();
 
-    let leptos_options = leptos::config::LeptosOptions::default();
+    let leptos_options = LeptosOptions::default();
     let routes = generate_route_list(App);
 
     let app = Router::new()
         .route("/api/*fn_name", post(leptos_axum::handle_server_fns))
         .leptos_routes(&leptos_options, routes, App)
-        .fallback(leptos_axum::file_and_error_handler)
+        .fallback(axum::routing::fallback(|_| async { (axum::http::StatusCode::NOT_FOUND, "Not Found").into_response() }))
         .with_state(leptos_options);
 
     let addr = std::env::var("CVT_ADDR")
