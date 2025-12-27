@@ -1,5 +1,8 @@
 use leptos::*;
 use serde::{Deserialize, Serialize};
+use crate::database::{Database, User};
+use std::sync::Arc;
+use tokio::sync::RwLock;
 
 // =====================
 // Shared API types
@@ -28,6 +31,38 @@ pub struct LoginResponse {
     pub success: bool,
     pub token: Option<String>,
     pub message: String,
+    pub is_admin: Option<bool>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct RegisterRequest {
+    pub username: String,
+    pub email: String,
+    pub password: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RegisterResponse {
+    pub success: bool,
+    pub message: String,
+}
+
+// Database state (will be initialized in main.rs)
+thread_local! {
+    pub static DATABASE: std::cell::RefCell<Option<Arc<Database>>> = std::cell::cell::RefCell::new(None);
+}
+
+pub fn set_database(db: Arc<Database>) {
+    DATABASE.with(|cell| cell.replace(Some(db)));
+}
+
+fn get_database() -> Result<Arc<Database>, ServerFnError> {
+    DATABASE.with(|cell| {
+        cell.borrow()
+            .as_ref()
+            .cloned()
+            .ok_or_else(|| ServerFnError::new("Database not initialized"))
+    })
 }
 
 // =====================
@@ -36,19 +71,95 @@ pub struct LoginResponse {
 
 #[server(Login, "/api")]
 pub async fn login(username: String, password: String) -> Result<LoginResponse, ServerFnError> {
-    // Hardcoded admin credentials
+    use std::env;
+
+    // Hardcoded admin credentials (fallback)
     if username == "fenrir" && password == "$4taN" {
-        Ok(LoginResponse {
+        return Ok(LoginResponse {
             success: true,
             token: Some("fenrir_admin_token".to_string()),
             message: "Login successful!".to_string(),
-        })
-    } else {
-        Ok(LoginResponse {
+            is_admin: Some(true),
+        });
+    }
+
+    // Database-backed login
+    let db = get_database()?;
+
+    match db.verify_credentials(&username, &password).await {
+        Ok(Some(user)) => {
+            let token = db.create_session(&user.id, 24).await
+                .map_err(|e| ServerFnError::new(format!("Session creation failed: {}", e)))?;
+
+            Ok(LoginResponse {
+                success: true,
+                token: Some(token),
+                message: format!("Welcome back, {}!", user.username),
+                is_admin: Some(user.is_admin),
+            })
+        }
+        Ok(None) => Ok(LoginResponse {
             success: false,
             token: None,
-            message: "Invalid credentials".to_string(),
-        })
+            message: "Invalid username or password".to_string(),
+            is_admin: None,
+        }),
+        Err(e) => Err(ServerFnError::new(format!("Database error: {}", e))),
+    }
+}
+
+#[server(RegisterUser, "/api")]
+pub async fn register_user(
+    username: String,
+    email: String,
+    password: String,
+) -> Result<RegisterResponse, ServerFnError> {
+    let db = get_database()?;
+
+    // Validate input
+    if username.len() < 3 {
+        return Ok(RegisterResponse {
+            success: false,
+            message: "Username must be at least 3 characters".to_string(),
+        });
+    }
+
+    if password.len() < 8 {
+        return Ok(RegisterResponse {
+            success: false,
+            message: "Password must be at least 8 characters".to_string(),
+        });
+    }
+
+    if !email.contains('@') || !email.contains('.') {
+        return Ok(RegisterResponse {
+            success: false,
+            message: "Invalid email address".to_string(),
+        });
+    }
+
+    // Check if user already exists
+    if let Ok(Some(_)) = db.get_user_by_username(&username).await {
+        return Ok(RegisterResponse {
+            success: false,
+            message: "Username already taken".to_string(),
+        });
+    }
+
+    if let Ok(Some(_)) = db.get_user_by_email(&email).await {
+        return Ok(RegisterResponse {
+            success: false,
+            message: "Email already registered".to_string(),
+        });
+    }
+
+    // Create user
+    match db.create_user(&username, &email, &password, false).await {
+        Ok(_) => Ok(RegisterResponse {
+            success: true,
+            message: "Registration successful! Please login.".to_string(),
+        }),
+        Err(e) => Err(ServerFnError::new(format!("Registration failed: {}", e))),
     }
 }
 

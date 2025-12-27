@@ -4,7 +4,7 @@ use leptos::*;
 use leptos_meta::*;
 use leptos_router::{Route, Router, Routes};
 
-use crate::routes::{LandingRoute, AdminRoute, AdminDashboardRoute};
+use crate::routes::{LandingRoute, AdminRoute, AdminDashboardRoute, LoginRoute, RegisterRoute};
 
 #[component]
 pub fn App() -> impl IntoView {
@@ -19,6 +19,8 @@ pub fn App() -> impl IntoView {
             <main>
                 <Routes>
                     <Route path="/" view=LandingRoute/>
+                    <Route path="/auth/login" view=LoginRoute/>
+                    <Route path="/auth/register" view=RegisterRoute/>
                     <Route path="/admin" view=AdminRoute/>
                     <Route path="/admin/dashboard" view=AdminDashboardRoute/>
                 </Routes>
