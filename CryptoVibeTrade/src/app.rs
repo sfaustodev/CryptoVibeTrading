@@ -1,13 +1,10 @@
 #![forbid(unsafe_code)]
 
-pub mod routes;
-pub mod components;
-
 use leptos::*;
 use leptos_meta::*;
-use leptos_router::{Route, Router, Routes, History};
+use leptos_router::{Route, Router, Routes};
 
-use routes::{LandingRoute, AdminRoute, AdminDashboardRoute};
+use crate::routes::{LandingRoute, AdminRoute, AdminDashboardRoute};
 
 #[component]
 pub fn App() -> impl IntoView {
