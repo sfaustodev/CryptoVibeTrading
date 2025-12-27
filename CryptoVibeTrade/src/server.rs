@@ -171,12 +171,14 @@ pub async fn grok_analyze(
 ) -> Result<String, ServerFnError> {
     use std::env;
 
-    let api_key = env::var("XAI_API_KEY")
+    // Try GROK_API_KEY first (from .zshrc), fall back to XAI_API_KEY
+    let api_key = env::var("GROK_API_KEY")
+        .or_else(|_| env::var("XAI_API_KEY"))
         .unwrap_or_else(|_| "demo_key".to_string());
 
     if api_key == "demo_key" {
         return Ok(format!(
-            "🐺 Fenrir Grok Analysis\n\n⚠️ Please add XAI_API_KEY to .env file\nGet from: https://x.ai/\n\nSelected: {}\nPrompt: {}\n\n• Risk analysis requires real API\n• Please configure XAI_API_KEY\n\nDYOR!",
+            "🐺 Fenrir Grok Analysis\n\n⚠️ Please add GROK_API_KEY to .env file or export it in your shell\nGet from: https://x.ai/\n\nAdd to .env: GROK_API_KEY=your_key_here\nOr export: export GROK_API_KEY=your_key_here\n\nSelected: {}\nPrompt: {}\n\n• Risk analysis requires real API\n• Please configure GROK_API_KEY\n\nDYOR!",
             selected_text, prompt
         ));
     }
@@ -352,4 +354,92 @@ pub async fn ai_analyze(
         .and_then(|c| c.content.parts.get(0))
         .map(|p| p.text.clone())
         .unwrap_or_else(|| "No response from Gemini. DYOR!".to_string()))
+}
+
+// =====================
+// GLM API (Zhipu AI - Alternative)
+// =====================
+
+#[server(GlmAnalyze, "/api")]
+pub async fn glm_analyze(
+    prompt: String,
+    context: String,
+) -> Result<String, ServerFnError> {
+    use std::env;
+
+    let api_key = env::var("GLM_API_KEY")
+        .unwrap_or_else(|_| "demo_key".to_string());
+
+    if api_key == "demo_key" {
+        return Ok(format!(
+            "🤖 GLM AI Analysis (Zhipu AI)\n\n⚠️ Please add GLM_API_KEY to .env file\nGet from: https://open.bigmodel.cn/\n\nContext: {}\nPrompt: {}\n\n• Analysis requires real API\n• Please configure GLM_API_KEY\n\nDYOR!",
+            context, prompt
+        ));
+    }
+
+    let system = "You are Fenrir AI, a professional cryptocurrency analyst. Provide detailed technical analysis with specific insights about market trends, support/resistance levels, and risk assessment. Be concise but thorough.";
+
+    let glm_req = serde_json::json!({
+        "model": "glm-4",
+        "messages": [
+            {
+                "role": "system",
+                "content": system
+            },
+            {
+                "role": "user",
+                "content": format!("Context: {}\n\nQuestion: {}", context, prompt)
+            }
+        ],
+        "temperature": 0.7,
+        "top_p": 0.9,
+        "max_tokens": 1000
+    });
+
+    let url = "https://open.bigmodel.cn/api/paas/v4/chat/completions";
+
+    let client = reqwest::Client::new();
+    let resp = client
+        .post(url)
+        .header("Content-Type", "application/json")
+        .header("Authorization", format!("Bearer {}", api_key))
+        .json(&glm_req)
+        .send()
+        .await
+        .map_err(|e| ServerFnError::new(format!("network error: {}", e)))?;
+
+    if !resp.status().is_success() {
+        let status = resp.status();
+        let err = resp.text().await.unwrap_or_default();
+        return Err(ServerFnError::new(format!(
+            "GLM API error: {} {}",
+            status, err
+        )));
+    }
+
+    #[derive(Deserialize)]
+    struct GlmResp {
+        choices: Vec<Choice>,
+    }
+
+    #[derive(Deserialize)]
+    struct Choice {
+        message: GlmMessage,
+    }
+
+    #[derive(Deserialize)]
+    struct GlmMessage {
+        content: String,
+    }
+
+    let parsed = resp
+        .json::<GlmResp>()
+        .await
+        .map_err(|e| ServerFnError::new(format!("decode error: {}", e)))?;
+
+    Ok(parsed
+        .choices
+        .get(0)
+        .map(|c| c.message.content.clone())
+        .unwrap_or_else(|| "No response from GLM. DYOR!".to_string()))
 }
