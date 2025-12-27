@@ -1,17 +1,7 @@
 use leptos::*;
 use leptos_meta::*;
 use leptos_router::*;
-use wasm_bindgen::prelude::*;
 use crate::AiAnalyze;
-
-#[wasm_bindgen]
-extern "C" {
-    #[wasm_bindgen(js_namespace = window)]
-    fn speech_synthesis_support() -> bool;
-
-    #[wasm_bindgen(js_namespace = window)]
-    fn speak_text(text: &str);
-}
 
 #[component]
 pub fn LandingPage() -> impl IntoView {
@@ -68,11 +58,7 @@ pub fn LandingPage() -> impl IntoView {
             ).await {
                 Ok(response) => {
                     set_ai_analysis.set(response);
-
-                    // Voice synthesis
-                    if speech_synthesis_support() {
-                        speak_text(&response);
-                    }
+                    // Note: Voice synthesis requires JavaScript integration
                 }
                 Err(e) => {
                     set_error_message.set(format!("AI Analysis failed: {}", e));
@@ -336,29 +322,12 @@ pub fn LandingPage() -> impl IntoView {
                     } else if is_analyzing.get() {
                         view! { <div class="loading">"🔄 AI is analyzing the market...</div> }.into_view()
                     } else if ai_analysis.get().is_empty() {
-                        view! { <div style="color:#666">"Click 'AI Analysis' to get professional technical insights powered by Gemini AI"</div> }.into_view()
+                        view! { <div style="color:#666">"Use the button above for Gemini market analysis"</div> }.into_view()
                     } else {
                         view! { <div>{ai_analysis.get()}</div> }.into_view()
                     }
                 }}
             </div>
         </div>
-
-        <script>{r#"
-            // Voice synthesis setup
-            window.speech_synthesis_support = function() {
-                return 'speechSynthesis' in window;
-            };
-
-            window.speak_text = function(text) {
-                if ('speechSynthesis' in window) {
-                    const utterance = new SpeechSynthesisUtterance(text);
-                    utterance.rate = 0.9;
-                    utterance.pitch = 1.0;
-                    utterance.volume = 1.0;
-                    speechSynthesis.speak(utterance);
-                }
-            };
-        "#}</script>
     }
 }
