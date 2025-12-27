@@ -1,9 +1,10 @@
 use leptos::*;
 use leptos_meta::*;
-use leptos_router::navigate;
+use leptos_router::*;
 
 #[component]
 pub fn DashboardPage() -> impl IntoView {
+    let navigate = use_navigate();
     view! {
         <Style>{r#"
             :root {
@@ -106,12 +107,6 @@ pub fn DashboardPage() -> impl IntoView {
                 flex-shrink: 0;
             }
 
-            .iframe-header::before {
-                content: 'Ï';
-                color: var(--neon-orange);
-                font-size: 10px;
-            }
-
             .iframe-content {
                 flex: 1;
                 width: 100%;
@@ -134,11 +129,11 @@ pub fn DashboardPage() -> impl IntoView {
 
         <div class="dashboard-container">
             <div class="dashboard-header">
-                <div class="dashboard-title">"=: Fenrir Dashboard"</div>
+                <div class="dashboard-title">"ğŸº Fenrir Dashboard"</div>
                 <button
                     class="logout-btn"
                     on:click=move |_| {
-                        navigate("/admin");
+                        navigate(&"/admin".to_string(), Default::default());
                     }
                 >
                     "Logout"

@@ -1,10 +1,11 @@
 use leptos::*;
 use leptos_meta::*;
-use leptos_router::navigate;
-use crate::Login;
+use leptos_router::*;
+use crate::login;
 
 #[component]
 pub fn LoginPage() -> impl IntoView {
+    let navigate = use_navigate();
     let (username, set_username) = create_signal(String::new());
     let (password, set_password) = create_signal(String::new());
     let (error, set_error) = create_signal(String::new());
@@ -146,7 +147,9 @@ pub fn LoginPage() -> impl IntoView {
                         prop:value=password
                         on:input=move |ev| set_password.set(event_target_value(&ev))
                         placeholder="Enter password"
-                        on:keydown=move |ev| {
+                        on:keydown={
+                            let navigate = navigate.clone();
+                            move |ev| {
                             if ev.key() == "Enter" {
                                 let username_val = username.get();
                                 let password_val = password.get();
@@ -159,11 +162,12 @@ pub fn LoginPage() -> impl IntoView {
                                 set_is_loading.set(true);
                                 set_error.set(String::new());
 
+                                let navigate = navigate.clone();
                                 spawn_local(async move {
-                                    match Login(username_val, password_val).await {
+                                    match login(username_val, password_val).await {
                                         Ok(response) => {
                                             if response.success {
-                                                navigate("/admin/dashboard");
+                                                navigate(&"/admin/dashboard".to_string(), Default::default());
                                             } else {
                                                 set_error.set(response.message);
                                                 set_is_loading.set(false);
@@ -176,6 +180,7 @@ pub fn LoginPage() -> impl IntoView {
                                     }
                                 });
                             }
+                        }
                         }
                     />
                 </div>
@@ -197,11 +202,12 @@ pub fn LoginPage() -> impl IntoView {
                         set_is_loading.set(true);
                         set_error.set(String::new());
 
+                        let navigate_clone = navigate.clone();
                         spawn_local(async move {
-                            match Login(username_val, password_val).await {
+                            match login(username_val, password_val).await {
                                 Ok(response) => {
                                     if response.success {
-                                        navigate("/admin/dashboard");
+                                        navigate_clone(&"/admin/dashboard".to_string(), Default::default());
                                     } else {
                                         set_error.set(response.message);
                                         set_is_loading.set(false);
