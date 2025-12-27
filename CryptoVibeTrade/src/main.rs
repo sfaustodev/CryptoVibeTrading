@@ -2,7 +2,7 @@
 
 use leptos::*;
 use axum::response::IntoResponse;
-use cvt::App;
+use cryptovibetrading::App;
 
 // =====================
 // Grok API Handler for Direct API Calls
@@ -220,7 +220,7 @@ async fn main() {
         })
         .with_state(leptos_options);
 
-    let addr = std::env::var("CVT_ADDR")
+    let addr = std::env::var("CRYPTOVIBETRADING_ADDR")
         .ok()
         .and_then(|s| s.parse::<SocketAddr>().ok())
         .unwrap_or_else(|| SocketAddr::from(([127, 0, 0, 1], 3000)));
