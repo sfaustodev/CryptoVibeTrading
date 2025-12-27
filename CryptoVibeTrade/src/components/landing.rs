@@ -1,7 +1,7 @@
 use leptos::*;
 use leptos_meta::*;
 use leptos_router::*;
-use crate::AiAnalyze;
+use crate::server::ai_analyze;
 
 #[component]
 pub fn LandingPage() -> impl IntoView {
@@ -51,7 +51,7 @@ pub fn LandingPage() -> impl IntoView {
         let indicators = "Ichimoku Cloud, RSI, MACD, Bollinger Bands, Volume".to_string();
 
         spawn_local(async move {
-            match AiAnalyze(
+            match ai_analyze(
                 "Analyze the current market conditions and provide technical analysis.".to_string(),
                 asset.clone(),
                 indicators.clone(),
@@ -318,13 +318,15 @@ pub fn LandingPage() -> impl IntoView {
             <div class="ai-analysis-box">
                 {move || {
                     if !error_message.get().is_empty() {
-                        view! { <div class="error-message">{error_message.get()}</div> }.into_view()
+                        let msg = error_message.get();
+                        view! { <div class="error-message">{msg}</div> }
                     } else if is_analyzing.get() {
-                        view! { <div class="loading">"🔄 AI is analyzing the market...</div> }.into_view()
+                        view! { <div class="loading">"🔄 AI is analyzing the market..."</div> }
                     } else if ai_analysis.get().is_empty() {
-                        view! { <div style="color:#666">"Use the button above for Gemini market analysis"</div> }.into_view()
+                        view! { <div style="color:#666">"Press the button above to start."</div> }
                     } else {
-                        view! { <div>{ai_analysis.get()}</div> }.into_view()
+                        let analysis = ai_analysis.get();
+                        view! { <div>{analysis}</div> }
                     }
                 }}
             </div>

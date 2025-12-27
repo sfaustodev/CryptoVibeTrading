@@ -49,7 +49,7 @@ pub struct RegisterResponse {
 
 // Database state (will be initialized in main.rs)
 thread_local! {
-    pub static DATABASE: std::cell::RefCell<Option<Arc<Database>>> = std::cell::cell::RefCell::new(None);
+    pub static DATABASE: std::cell::RefCell<Option<Arc<Database>>> = std::cell::RefCell::new(None);
 }
 
 pub fn set_database(db: Arc<Database>) {

@@ -1,7 +1,7 @@
 use leptos::*;
 use leptos_meta::*;
 use leptos_router::*;
-use crate::login;
+use crate::server::login;
 
 #[component]
 pub fn LoginPage() -> impl IntoView {

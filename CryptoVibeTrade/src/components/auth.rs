@@ -1,7 +1,7 @@
 use leptos::*;
 use leptos_meta::*;
 use leptos_router::*;
-use crate::RegisterUser;
+use crate::server::{register_user, login};
 
 #[component]
 pub fn RegisterPage() -> impl IntoView {
@@ -42,7 +42,7 @@ pub fn RegisterPage() -> impl IntoView {
 
         let navigate = navigate.clone();
         spawn_local(async move {
-            match RegisterUser(username_val, email_val, password_val).await {
+            match register_user(username_val, email_val, password_val).await {
                 Ok(response) => {
                     if response.success {
                         set_success.set(response.message);

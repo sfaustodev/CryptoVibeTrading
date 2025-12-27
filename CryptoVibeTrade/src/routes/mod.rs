@@ -1,6 +1,6 @@
 use leptos::*;
 use crate::components::landing::LandingPage;
-use crate::components::admin::DashboardPage;
+use crate::components::dashboard::DashboardPage;
 use crate::components::auth::{RegisterPage, LoginPage};
 
 #[component]
