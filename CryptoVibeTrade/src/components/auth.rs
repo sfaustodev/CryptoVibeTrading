@@ -47,13 +47,8 @@ pub fn RegisterPage() -> impl IntoView {
                     if response.success {
                         set_success.set(response.message);
                         set_is_loading.set(false);
-                        // Redirect to login after 2 seconds
-                        setTimeout(
-                            move || {
-                                navigate(&"/auth/login".to_string(), Default::default());
-                            },
-                            2000,
-                        );
+                        // Redirect to login immediately
+                        navigate(&"/auth/login".to_string(), Default::default());
                     } else {
                         set_error.set(response.message);
                         set_is_loading.set(false);
@@ -497,7 +492,7 @@ pub fn LoginPage() -> impl IntoView {
                 <button
                     class="btn btn-primary"
                     style="margin-top:16px;"
-                    on:click=handle_login
+                    on:click=move |_| handle_login(())
                     disabled=is_loading
                 >
                     {move || if is_loading.get() { "Authenticating..." } else { "Login" }}
