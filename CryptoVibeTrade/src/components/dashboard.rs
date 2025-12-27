@@ -3,7 +3,7 @@ use leptos_meta::*;
 use leptos_router::*;
 use web_sys::MouseEvent;
 use crate::components::dragon::Dragon;
-use crate::server::grok_analyze;
+use crate::server::{grok_analyze, verify_nft};
 
 #[component]
 pub fn DashboardPage() -> impl IntoView {
@@ -22,6 +22,13 @@ pub fn DashboardPage() -> impl IntoView {
     let (analysis_text, set_analysis_text) = create_signal(String::new());
     let (is_analyzing, set_is_analyzing) = create_signal(false);
     let (show_speech, set_show_speech) = create_signal(false);
+
+    // NFT verification state
+    let (wallet_address, set_wallet_address) = create_signal(String::new());
+    let (mint_address, set_mint_address) = create_signal(String::new());
+    let (is_nft_holder, set_is_nft_holder) = create_signal(false);
+    let (is_verifying, set_is_verifying) = create_signal(false);
+    let (nft_message, set_nft_message) = create_signal(String::new());
 
     // Mouse tracking for dragon cursor following
     let handle_mouse_move = move |ev: MouseEvent| {
@@ -59,6 +66,11 @@ pub fn DashboardPage() -> impl IntoView {
 
     // Grok analysis + voice synthesis handler
     let handle_analyze = move |_| {
+        // Check NFT verification first
+        if !is_nft_holder.get() {
+            set_nft_message.set("⚠️ NFT verification required for Grok analysis".to_string());
+            return;
+        }
         let set_is_speaking = set_is_speaking.clone();
         let set_analysis_text = set_analysis_text.clone();
         let set_is_analyzing = set_is_analyzing.clone();
@@ -102,6 +114,34 @@ pub fn DashboardPage() -> impl IntoView {
                 }
             }
             set_is_analyzing.set(false);
+        });
+    };
+
+    // NFT verification handler
+    let handle_verify_nft = move |_| {
+        let wallet = wallet_address.get();
+        let mint = mint_address.get();
+
+        if wallet.is_empty() || mint.is_empty() {
+            set_nft_message.set("Please enter both wallet and mint addresses".to_string());
+            return;
+        }
+
+        set_is_verifying.set(true);
+        set_nft_message.set("Verifying NFT ownership...".to_string());
+
+        spawn_local(async move {
+            match verify_nft(wallet, mint).await {
+                Ok(response) => {
+                    set_is_nft_holder.set(response.is_holder);
+                    set_nft_message.set(response.message);
+                }
+                Err(e) => {
+                    set_nft_message.set(format!("Verification failed: {}", e));
+                    set_is_nft_holder.set(false);
+                }
+            }
+            set_is_verifying.set(false);
         });
     };
 
@@ -319,6 +359,95 @@ pub fn DashboardPage() -> impl IntoView {
                 to { transform: rotate(360deg); }
             }
 
+            .nft-verify-section {
+                padding: 16px 20px;
+                background: rgba(26, 26, 26, 0.8);
+                border-bottom: 1px solid var(--border-dim);
+                display: flex;
+                flex-direction: column;
+                gap: 12px;
+                flex-shrink: 0;
+            }
+
+            .nft-verify-title {
+                font-size: 11px;
+                font-weight: 600;
+                letter-spacing: 0.15em;
+                text-transform: uppercase;
+                color: #888;
+            }
+
+            .nft-inputs {
+                display: flex;
+                gap: 12px;
+                align-items: center;
+            }
+
+            .nft-input {
+                flex: 1;
+                padding: 10px 14px;
+                border: 1px solid var(--border-dim);
+                border-radius: 8px;
+                background: rgba(0, 0, 0, 0.8);
+                color: #fff;
+                font-family: inherit;
+                font-size: 11px;
+            }
+
+            .nft-input:focus {
+                outline: none;
+                border-color: var(--neon-orange);
+                box-shadow: 0 0 15px rgba(255, 107, 53, 0.2);
+            }
+
+            .verify-btn {
+                padding: 10px 20px;
+                border: 1px solid #4a4a4a;
+                background: transparent;
+                color: #fff;
+                border-radius: 8px;
+                cursor: pointer;
+                font-family: inherit;
+                font-size: 10px;
+                font-weight: 600;
+                letter-spacing: 0.1em;
+                text-transform: uppercase;
+                transition: all 0.3s;
+                white-space: nowrap;
+            }
+
+            .verify-btn:hover:not(:disabled) {
+                border-color: var(--neon-orange);
+                box-shadow: 0 0 15px rgba(255, 107, 53, 0.3);
+            }
+
+            .verify-btn:disabled {
+                opacity: 0.5;
+                cursor: not-allowed;
+            }
+
+            .nft-status {
+                font-size: 11px;
+                padding: 8px 12px;
+                border-radius: 6px;
+                background: rgba(0, 0, 0, 0.5);
+            }
+
+            .nft-status.verified {
+                border: 1px solid #00ff88;
+                color: #00ff88;
+            }
+
+            .nft-status.error {
+                border: 1px solid var(--neon-red);
+                color: var(--neon-red);
+            }
+
+            .nft-status.neutral {
+                border: 1px solid #4a4a4a;
+                color: #888;
+            }
+
             .dragon-speech-bubble {
                 position: absolute;
                 bottom: 80px;
@@ -378,6 +507,42 @@ pub fn DashboardPage() -> impl IntoView {
                     >
                         "Logout"
                     </button>
+                </div>
+            </div>
+
+            // NFT Verification Section
+            <div class="nft-verify-section">
+                <div class="nft-verify-title">"🔮 NFT Verification Required"</div>
+                <div class="nft-inputs">
+                    <input
+                        type="text"
+                        class="nft-input"
+                        placeholder="Wallet Address"
+                        prop:value=wallet_address
+                        on:input=move |ev| set_wallet_address.set(event_target_value(&ev))
+                    />
+                    <input
+                        type="text"
+                        class="nft-input"
+                        placeholder="NFT Mint Address"
+                        prop:value=mint_address
+                        on:input=move |ev| set_mint_address.set(event_target_value(&ev))
+                    />
+                    <button
+                        class="verify-btn"
+                        on:click=handle_verify_nft
+                        disabled=is_verifying
+                    >
+                        {move || if is_verifying.get() { "🔄 Verifying..." } else { "Verify" }}
+                    </button>
+                </div>
+                <div
+                    class="nft-status"
+                    class:verified=is_nft_holder
+                    class:error=move || !is_nft_holder.get() && !nft_message.get().is_empty()
+                    class:neutral=move || nft_message.get().is_empty()
+                >
+                    {move || nft_message.get()}
                 </div>
             </div>
 
