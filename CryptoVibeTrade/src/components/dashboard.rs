@@ -1,9 +1,12 @@
 use leptos::*;
 use leptos_meta::*;
 use leptos_router::*;
-use web_sys::MouseEvent;
+use web_sys::{MouseEvent, WebSocket as WebWebSocket};
+use wasm_bindgen::JsCast;
 use crate::components::dragon::Dragon;
+use crate::components::chart::TradingChart;
 use crate::server::{grok_analyze, verify_nft};
+use crate::types::Candle;
 
 #[component]
 pub fn DashboardPage() -> impl IntoView {
@@ -34,6 +37,68 @@ pub fn DashboardPage() -> impl IntoView {
     let (current_price, set_current_price) = create_signal(0.0f64);
     let (previous_price, set_previous_price) = create_signal(0.0f64);
     let (price_change_percent, set_price_change_percent) = create_signal(0.0f64);
+
+    // Real-time candle data signal
+    let (candles, set_candles) = create_signal(Vec::<Candle>::new());
+
+    // Initialize with some historical data (placeholder)
+    let initial_candles = vec![
+        Candle { time: 1704067200, open: 42000.0, high: 42500.0, low: 41800.0, close: 42300.0, volume: 1234.5 },
+        Candle { time: 1704070800, open: 42300.0, high: 42800.0, low: 42100.0, close: 42600.0, volume: 1456.7 },
+        Candle { time: 1704074400, open: 42600.0, high: 42900.0, low: 42400.0, close: 42450.0, volume: 1678.9 },
+        Candle { time: 1704078000, open: 42450.0, high: 42700.0, low: 42200.0, close: 42500.0, volume: 1890.2 },
+        Candle { time: 1704081600, open: 42500.0, high: 43100.0, low: 42400.0, close: 42900.0, volume: 2101.4 },
+    ];
+    set_candles.set(initial_candles);
+
+    // WebSocket connection for real-time data (Binance public stream)
+    let ws_url = "wss://stream.binance.com:9443/ws/btcusdt@kline_1m";
+    let set_candles_ws = set_candles.clone();
+
+    // Create WebSocket connection using web_sys
+    let ws = WebWebSocket::new(ws_url).expect("Failed to create WebSocket");
+    leptos::logging::log!("✅ WebSocket created, connecting to Binance...");
+
+    // Set up onmessage handler
+    let onmessage_callback = wasm_bindgen::closure::Closure::wrap(Box::new(move |event: web_sys::MessageEvent| {
+        let data = event.data();
+        let text = data.as_string().expect("Failed to convert data to string");
+
+        if let Ok(json_data) = serde_json::from_str::<serde_json::Value>(&text) {
+            if let Some(kline) = json_data.get("k") {
+                let time = kline.get("t").and_then(|v| v.as_i64()).unwrap_or(0);
+                let open = kline.get("o").and_then(|v| v.as_str()).and_then(|s| s.parse().ok()).unwrap_or(0.0);
+                let high = kline.get("h").and_then(|v| v.as_str()).and_then(|s| s.parse().ok()).unwrap_or(0.0);
+                let low = kline.get("l").and_then(|v| v.as_str()).and_then(|s| s.parse().ok()).unwrap_or(0.0);
+                let close = kline.get("c").and_then(|v| v.as_str()).and_then(|s| s.parse().ok()).unwrap_or(0.0);
+                let volume = kline.get("v").and_then(|v| v.as_str()).and_then(|s| s.parse().ok()).unwrap_or(0.0);
+                let is_closed = kline.get("x").and_then(|v| v.as_bool()).unwrap_or(false);
+
+                let new_candle = Candle { time, open, high, low, close, volume };
+
+                // Update candles: if candle is closed, add new one; otherwise update last
+                set_candles_ws.update(|candles| {
+                    if is_closed {
+                        candles.push(new_candle);
+                        // Keep only last 50 candles
+                        if candles.len() > 50 {
+                            candles.remove(0);
+                        }
+                    } else if let Some(last) = candles.last_mut() {
+                        // Update the last candle (it's still forming)
+                        *last = new_candle;
+                    } else {
+                        candles.push(new_candle);
+                    }
+                });
+            }
+        }
+    }) as Box<dyn FnMut(_)>);
+
+    ws.set_onmessage(Some(onmessage_callback.as_ref().unchecked_ref()));
+    onmessage_callback.forget(); // Prevent callback from being dropped
+
+    leptos::logging::log!("✅ WebSocket connected to Binance");
 
     // Mouse tracking for dragon cursor following
     let handle_mouse_move = move |ev: MouseEvent| {
@@ -572,8 +637,22 @@ pub fn DashboardPage() -> impl IntoView {
                     </button>
                     <button
                         class="logout-btn"
-                        on:click=move |_| {
-                            navigate(&"/admin".to_string(), Default::default());
+                        on:click={
+                            let navigate = navigate.clone();
+                            move |_| {
+                                navigate(&"/whiteboard".to_string(), Default::default());
+                            }
+                        }
+                    >
+                        "🎨 Whiteboard"
+                    </button>
+                    <button
+                        class="logout-btn"
+                        on:click={
+                            let navigate = navigate.clone();
+                            move |_| {
+                                navigate(&"/admin".to_string(), Default::default());
+                            }
                         }
                     >
                         "Logout"
@@ -614,6 +693,14 @@ pub fn DashboardPage() -> impl IntoView {
                     class:neutral=move || nft_message.get().is_empty()
                 >
                     {move || nft_message.get()}
+                </div>
+            </div>
+
+            // Chart Section
+            <div class="iframe-wrapper" style="flex: 0 0 auto; height: 400px; margin-bottom: 16px;">
+                <div class="iframe-header">"📊 BTC/USDT Live Chart"</div>
+                <div style="padding: 16px; overflow-y: auto; flex: 1;">
+                    <TradingChart candles=candles.into() symbol="BTCUSDT".to_string() />
                 </div>
             </div>
 
