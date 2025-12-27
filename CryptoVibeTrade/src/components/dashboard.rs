@@ -30,6 +30,11 @@ pub fn DashboardPage() -> impl IntoView {
     let (is_verifying, set_is_verifying) = create_signal(false);
     let (nft_message, set_nft_message) = create_signal(String::new());
 
+    // Price monitoring state
+    let (current_price, set_current_price) = create_signal(0.0f64);
+    let (previous_price, set_previous_price) = create_signal(0.0f64);
+    let (price_change_percent, set_price_change_percent) = create_signal(0.0f64);
+
     // Mouse tracking for dragon cursor following
     let handle_mouse_move = move |ev: MouseEvent| {
         let x = ev.client_x() as f64;
@@ -144,6 +149,72 @@ pub fn DashboardPage() -> impl IntoView {
             set_is_verifying.set(false);
         });
     };
+
+    // Price monitoring effect - runs every 5 seconds
+    let check_prices = move || {
+        let set_is_firing = set_is_firing.clone();
+        let set_current_price = set_current_price.clone();
+        let set_previous_price = set_previous_price.clone();
+        let set_price_change_percent = set_price_change_percent.clone();
+        let current_price = current_price.clone();
+        let previous_price = previous_price.clone();
+
+        spawn_local(async move {
+            // Fetch SOL price from Binance API
+            match reqwest::get("https://api.binance.com/api/v3/ticker/price?symbol=SOLUSDT").await {
+                Ok(resp) => {
+                    if let Ok(data) = resp.json::<serde_json::Value>().await {
+                        if let Some(price_str) = data["price"].as_str() {
+                            if let Ok(price) = price_str.parse::<f64>() {
+                                set_previous_price.set(current_price.get());
+                                set_current_price.set(price);
+
+                                let prev = previous_price.get();
+                                let change_pct = if prev > 0.0 {
+                                    ((price - prev) / prev) * 100.0
+                                } else {
+                                    0.0
+                                };
+                                set_price_change_percent.set(change_pct);
+
+                                // Trigger fire breath on significant pump (>5%)
+                                if change_pct.abs() > 5.0 {
+                                    leptos::logging::log!("🔥 Price pump detected: {:.2}%!", change_pct);
+                                    set_is_firing.set(true);
+
+                                    // Fire breath for 2 seconds
+                                    let set_is_firing = set_is_firing.clone();
+                                    set_timeout(
+                                        move || {
+                                            set_is_firing.set(false);
+                                        },
+                                        std::time::Duration::from_secs(2),
+                                    );
+                                }
+                            }
+                        }
+                    }
+                }
+                Err(e) => {
+                    leptos::logging::log!("Price fetch error: {:?}", e);
+                }
+            }
+        });
+    };
+
+    // Start price monitoring loop
+    let check_prices_clone = check_prices.clone();
+    set_timeout(
+        move || {
+            check_prices_clone();
+            // Schedule next check using gloo timers
+            let check = check_prices.clone();
+            let _interval = gloo_timers::callback::Interval::new(5_000, move || {
+                check();
+            });
+        },
+        std::time::Duration::from_secs(1),
+    );
 
     view! {
         <Style>{r#"
