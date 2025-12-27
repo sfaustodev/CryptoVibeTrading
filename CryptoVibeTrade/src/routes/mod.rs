@@ -1,7 +1,3 @@
-pub mod landing;
-pub mod admin;
-pub mod dashboard;
-
 use leptos::*;
 use crate::components::landing::LandingPage;
 use crate::components::admin::LoginPage;
