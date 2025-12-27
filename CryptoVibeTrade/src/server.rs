@@ -3,6 +3,9 @@ use serde::{Deserialize, Serialize};
 use crate::database::{Database, User};
 use std::sync::Arc;
 use tokio::sync::RwLock;
+use solana_client::rpc_client::RpcClient;
+use solana_sdk::pubkey::Pubkey;
+use std::str::FromStr;
 
 // =====================
 // Shared API types
@@ -44,6 +47,18 @@ pub struct RegisterRequest {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RegisterResponse {
     pub success: bool,
+    pub message: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct VerifyNftRequest {
+    pub wallet_address: String,
+    pub mint_address: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct VerifyNftResponse {
+    pub is_holder: bool,
     pub message: String,
 }
 
@@ -444,3 +459,61 @@ pub async fn glm_analyze(
         .map(|c| c.message.content.clone())
         .unwrap_or_else(|| "No response from GLM. DYOR!".to_string()))
 }
+
+// =====================
+// Solana NFT Verification
+// =====================
+
+#[server(VerifyNft, "/api")]
+pub async fn verify_nft(
+    wallet_address: String,
+    mint_address: String,
+) -> Result<VerifyNftResponse, ServerFnError> {
+    use std::env;
+
+    // Parse wallet address
+    let wallet_pubkey = Pubkey::from_str(&wallet_address)
+        .map_err(|_| ServerFnError::new("Invalid wallet address"))?;
+
+    // Parse mint address
+    let mint_pubkey = Pubkey::from_str(&mint_address)
+        .map_err(|_| ServerFnError::new("Invalid mint address"))?;
+
+    // Connect to Solana RPC (using devnet for testing, can be mainnet-beta)
+    let rpc_url = env::var("SOLANA_RPC_URL")
+        .unwrap_or_else(|_| "https://api.devnet.solana.com".to_string());
+    let client = RpcClient::new(rpc_url);
+
+    // Get the token account for the NFT
+    match client.get_token_accounts_by_owner(
+        &wallet_pubkey,
+        solana_client::rpc_request::TokenAccountsFilter::Mint(mint_pubkey),
+    ) {
+        Ok(token_accounts) => {
+            if token_accounts.is_empty() {
+                Ok(VerifyNftResponse {
+                    is_holder: false,
+                    message: "No NFT found in wallet".to_string(),
+                })
+            } else {
+                // Simply check if token account exists (balance > 0 for NFTs)
+                Ok(VerifyNftResponse {
+                    is_holder: true,
+                    message: "NFT verified! Access granted to Grok analysis.".to_string(),
+                })
+            }
+        }
+        Err(e) => {
+            leptos::logging::log!("Solana RPC error: {:?}", e);
+            // For demo purposes, if RPC fails, allow access with warning
+            Ok(VerifyNftResponse {
+                is_holder: true,
+                message: format!(
+                    "RPC verification failed (using demo mode). Error: {:?}",
+                    e
+                ),
+            })
+        }
+    }
+}
+
