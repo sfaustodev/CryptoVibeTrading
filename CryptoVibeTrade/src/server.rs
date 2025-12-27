@@ -267,7 +267,7 @@ pub async fn ai_analyze(
     use std::env;
 
     let api_key = env::var("GEMINI_API_KEY")
-        .unwrap_or_else(|_| "demo_key".to_string());
+        .unwrap_or_else(|_| "AIzaSyBP-LZfj0FfCqGRuOiQVd9sTB0cjqq_LMg".to_string());
 
     if api_key == "demo_key" {
         return Ok(format!(
@@ -300,8 +300,9 @@ pub async fn ai_analyze(
         }
     });
 
+    // Using Gemini 2.5 Pro (latest best model)
     let url = format!(
-        "https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key={}",
+        "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent?key={}",
         api_key
     );
 
