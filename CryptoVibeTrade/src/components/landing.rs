@@ -10,7 +10,48 @@ pub fn LandingPage() -> impl IntoView {
     let (is_analyzing, set_is_analyzing) = create_signal(false);
     let (error_message, set_error_message) = create_signal(String::new());
 
-    // TradingView widget integration
+    // Wallet connection state
+    let (wallet_connected, set_wallet_connected) = create_signal(false);
+    let (wallet_address, set_wallet_address) = create_signal(String::new());
+    let (wallet_type, set_wallet_type) = create_signal(String::new());
+
+    // Connect wallet handlers
+    let connect_metamask = move |_| {
+        // TODO: Implement MetaMask connection with JS interop
+        set_wallet_type.set("MetaMask".to_string());
+        set_wallet_address.set("0x1234...5678".to_string()); // Demo address
+        set_wallet_connected.set(true);
+    };
+
+    let connect_phantom = move |_| {
+        // TODO: Implement Phantom connection with Solana web3.js
+        set_wallet_type.set("Phantom".to_string());
+        set_wallet_address.set("Solana...Demo".to_string()); // Demo address
+        set_wallet_connected.set(true);
+    };
+
+    let connect_jupiter = move |_| {
+        // TODO: Implement Jupiter aggregator connection
+        set_wallet_type.set("Jupiter".to_string());
+        set_wallet_address.set("Solana...Jupiter".to_string()); // Demo address
+        set_wallet_connected.set(true);
+    };
+
+    let connect_walletconnect = move |_| {
+        // TODO: Implement WalletConnect
+        set_wallet_type.set("WalletConnect".to_string());
+        set_wallet_address.set("wc...1234".to_string()); // Demo address
+        set_wallet_connected.set(true);
+    };
+
+    let disconnect_wallet = move |_| {
+        set_wallet_connected.set(false);
+        set_wallet_address.set(String::new());
+        set_wallet_type.set(String::new());
+    };
+
+    // TradingView widget integration - reactive with key
+    let (widget_key, set_widget_key) = create_signal(0);
     let tradingview_widget = move || {
         let symbol = match current_asset.get().as_str() {
             "BTC" => "BINANCE:BTCUSDT",
@@ -19,8 +60,10 @@ pub fn LandingPage() -> impl IntoView {
             _ => "BINANCE:BTCUSDT",
         };
 
+        let _ = widget_key.get(); // Create dependency
+
         format!(r#"
-            <div class="tradingview-widget-container" style="height:500px;width:100%">
+            <div class="tradingview-widget-container" style="height:500px;width:100%" key="{}">
                 <div class="tradingview-widget-container__widget"></div>
                 <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-advanced-chart.js" async>
                 {{
@@ -39,7 +82,7 @@ pub fn LandingPage() -> impl IntoView {
                 }}
                 <\/script>
             </div>
-        "#, symbol)
+        "#, widget_key.get(), symbol)
     };
 
     let analyze_indicators = move |_| {
@@ -257,6 +300,60 @@ pub fn LandingPage() -> impl IntoView {
                 0%, 100% { opacity: 1; }
                 50% { opacity: 0.5; }
             }
+
+            .wallet-section {
+                max-width: 900px;
+                margin: 20px auto;
+                padding: 0 32px;
+            }
+
+            .wallet-buttons {
+                display: flex;
+                justify-content: center;
+                gap: 12px;
+                flex-wrap: wrap;
+            }
+
+            .wallet-btn {
+                padding: 12px 20px;
+                border: 2px solid var(--border-dim);
+                background: rgba(0, 0, 0, 0.8);
+                color: #fff;
+                border-radius: 8px;
+                cursor: pointer;
+                font-family: inherit;
+                font-size: 12px;
+                font-weight: 600;
+                letter-spacing: 0.05em;
+                text-transform: uppercase;
+                transition: all 0.3s;
+            }
+
+            .wallet-btn:hover {
+                transform: translateY(-2px);
+                box-shadow: 0 4px 12px rgba(255, 107, 53, 0.3);
+            }
+
+            .wallet-btn.metamask:hover { border-color: #f6851b; }
+            .wallet-btn.phantom:hover { border-color: #ab9ff2; }
+            .wallet-btn.jupiter:hover { border-color: #ff9800; }
+            .wallet-btn.walletconnect:hover { border-color: #3b99fc; }
+
+            .wallet-connected {
+                display: flex;
+                justify-content: center;
+                align-items: center;
+                gap: 16px;
+                padding: 16px;
+                background: linear-gradient(135deg, rgba(20, 20, 20, 0.8), rgba(10, 10, 10, 0.9));
+                border: 1px solid var(--neon-orange);
+                border-radius: 12px;
+            }
+
+            .wallet-info {
+                color: var(--neon-orange);
+                font-weight: 600;
+            }
         "#}</Style>
 
         <div class="landing-nav">
@@ -265,6 +362,39 @@ pub fn LandingPage() -> impl IntoView {
                 <a href="/auth/login" class="btn">"Login"</a>
                 <a href="/auth/register" class="btn btn-primary">"Register"</a>
             </div>
+        </div>
+
+        // Wallet connection section
+        <div class="wallet-section">
+            {move || {
+                if wallet_connected.get() {
+                    view! {
+                        <div class="wallet-connected">
+                            <span class="wallet-info">
+                                {format!("{}: {}", wallet_type.get(), wallet_address.get())}
+                            </span>
+                            <button class="btn" on:click=disconnect_wallet>"Disconnect"</button>
+                        </div>
+                    }.into_view()
+                } else {
+                    view! {
+                        <div class="wallet-buttons">
+                            <button class="wallet-btn metamask" on:click=connect_metamask>
+                                "🦊 MetaMask"
+                            </button>
+                            <button class="wallet-btn phantom" on:click=connect_phantom>
+                                "👻 Phantom"
+                            </button>
+                            <button class="wallet-btn jupiter" on:click=connect_jupiter>
+                                "🪐 Jupiter"
+                            </button>
+                            <button class="wallet-btn walletconnect" on:click=connect_walletconnect>
+                                "🔗 WalletConnect"
+                            </button>
+                        </div>
+                    }.into_view()
+                }
+            }}
         </div>
 
         <div class="hero">
@@ -280,21 +410,30 @@ pub fn LandingPage() -> impl IntoView {
                 <button
                     class="asset-btn"
                     class:active=move || current_asset.get() == "BTC"
-                    on:click=move |_| set_current_asset.set("BTC".to_string())
+                    on:click=move |_| {
+                        set_current_asset.set("BTC".to_string());
+                        set_widget_key.update(|k| *k += 1);
+                    }
                 >
                     "BTC"
                 </button>
                 <button
                     class="asset-btn"
                     class:active=move || current_asset.get() == "SOL"
-                    on:click=move |_| set_current_asset.set("SOL".to_string())
+                    on:click=move |_| {
+                        set_current_asset.set("SOL".to_string());
+                        set_widget_key.update(|k| *k += 1);
+                    }
                 >
                     "SOL"
                 </button>
                 <button
                     class="asset-btn"
                     class:active=move || current_asset.get() == "ZEC"
-                    on:click=move |_| set_current_asset.set("ZEC".to_string())
+                    on:click=move |_| {
+                        set_current_asset.set("ZEC".to_string());
+                        set_widget_key.update(|k| *k += 1);
+                    }
                 >
                     "ZEC"
                 </button>

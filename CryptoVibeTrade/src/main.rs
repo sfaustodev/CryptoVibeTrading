@@ -210,28 +210,37 @@ async fn main() {
         .with(tracing_subscriber::fmt::layer())
         .init();
 
-    // Initialize database
+    // Initialize database (optional - will fail gracefully if not available)
     let database_url = std::env::var("DATABASE_URL")
         .unwrap_or_else(|_| "postgresql://postgres:postgres@localhost/cryptovibetrading".to_string());
 
-    tracing::info!("Connecting to database...");
-    let db = Database::new(&database_url)
-        .await
-        .expect("Failed to connect to database");
+    tracing::info!("Attempting to connect to database...");
+    match Database::new(&database_url).await {
+        Ok(db) => {
+            // Run migrations
+            if let Err(e) = db.run_migrations().await {
+                tracing::warn!("Database migrations failed: {}", e);
+            } else {
+                tracing::info!("Database migrations completed");
+            }
 
-    // Run migrations
-    db.run_migrations()
-        .await
-        .expect("Failed to run migrations");
+            // Seed admin user
+            if let Err(e) = db.seed_admin_user().await {
+                tracing::warn!("Admin user seeding failed: {}", e);
+            } else {
+                tracing::info!("Admin user seeded successfully");
+            }
 
-    // Seed admin user
-    db.seed_admin_user()
-        .await
-        .expect("Failed to seed admin user");
-
-    // Make database available to server functions
-    let db = Arc::new(db);
-    set_database(db);
+            // Make database available to server functions
+            let db = Arc::new(db);
+            set_database(db);
+            tracing::info!("Database connected and initialized");
+        }
+        Err(e) => {
+            tracing::warn!("Database connection failed: {}. App will run in limited mode without auth.", e);
+            tracing::warn!("To enable auth, start PostgreSQL: docker-compose up -d");
+        }
+    }
 
     let leptos_options = LeptosOptions::default();
     let routes = generate_route_list(App);

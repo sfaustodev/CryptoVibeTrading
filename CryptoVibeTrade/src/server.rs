@@ -86,28 +86,39 @@ fn get_database() -> Result<Arc<Database>, ServerFnError> {
 
 #[server(Login, "/api")]
 pub async fn login(username: String, password: String) -> Result<LoginResponse, ServerFnError> {
-    // Database-backed login
-    let db = get_database()?;
+    // Try database-backed login first
+    match get_database() {
+        Ok(db) => {
+            match db.verify_credentials(&username, &password).await {
+                Ok(Some(user)) => {
+                    let token = db.create_session(&user.id, 24).await
+                        .map_err(|e| ServerFnError::new(format!("Session creation failed: {}", e)))?;
 
-    match db.verify_credentials(&username, &password).await {
-        Ok(Some(user)) => {
-            let token = db.create_session(&user.id, 24).await
-                .map_err(|e| ServerFnError::new(format!("Session creation failed: {}", e)))?;
-
+                    Ok(LoginResponse {
+                        success: true,
+                        token: Some(token),
+                        message: format!("Welcome back, {}!", user.username),
+                        is_admin: Some(user.is_admin),
+                    })
+                }
+                Ok(None) => Ok(LoginResponse {
+                    success: false,
+                    token: None,
+                    message: "Invalid username or password".to_string(),
+                    is_admin: None,
+                }),
+                Err(e) => Err(ServerFnError::new(format!("Database error: {}", e))),
+            }
+        }
+        Err(_) => {
+            // Database not available - return helpful error
             Ok(LoginResponse {
-                success: true,
-                token: Some(token),
-                message: format!("Welcome back, {}!", user.username),
-                is_admin: Some(user.is_admin),
+                success: false,
+                token: None,
+                message: "Database not available. Please start PostgreSQL with: docker-compose up -d".to_string(),
+                is_admin: None,
             })
         }
-        Ok(None) => Ok(LoginResponse {
-            success: false,
-            token: None,
-            message: "Invalid username or password".to_string(),
-            is_admin: None,
-        }),
-        Err(e) => Err(ServerFnError::new(format!("Database error: {}", e))),
     }
 }
 
