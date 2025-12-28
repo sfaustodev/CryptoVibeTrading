@@ -57,53 +57,17 @@ pub fn LandingPage() -> impl IntoView {
         set_wallet_type.set(String::new());
     };
 
-    // TradingView widget integration - reactive iframe that properly reloads
+    // TradingView widget - using reactive key to force iframe reload
     let (widget_key, set_widget_key) = create_signal(0);
 
-    let tradingview_html = move || {
-        let symbol = match current_asset.get().as_str() {
+    let tradingview_symbol = move || {
+        let _ = widget_key.get(); // Reactive dependency
+        match current_asset.get().as_str() {
             "BTC" => "BINANCE:BTCUSDT",
             "SOL" => "BINANCE:SOLUSDT",
             "ZEC" => "BINANCE:ZECUSDT",
             _ => "BINANCE:BTCUSDT",
-        };
-
-        let _ = widget_key.get(); // Create reactive dependency
-
-        format!(r#"
-            <!DOCTYPE html>
-            <html>
-            <head>
-                <meta charset="utf-8">
-                <meta name="viewport" content="width=device-width, initial-scale=1.0">
-                <style>
-                    body, html {{ margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; }}
-                    .tradingview-widget-container {{ width: 100%; height: 100%; }}
-                </style>
-            </head>
-            <body>
-                <div class="tradingview-widget-container">
-                    <div class="tradingview-widget-container__widget"></div>
-                    <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-advanced-chart.js" async>
-                    {{
-                        "autosize": true,
-                        "symbol": "{}",
-                        "interval": "D",
-                        "timezone": "Etc/UTC",
-                        "theme": "dark",
-                        "style": "1",
-                        "locale": "en",
-                        "enable_publishing": false,
-                        "hide_side_toolbar": false,
-                        "allow_symbol_change": true,
-                        "calendar": false,
-                        "support_host": "https://www.tradingview.com"
-                    }}
-                    <\/script>
-                </div>
-            </body>
-            </html>
-        "#, symbol)
+        }
     };
 
     let analyze_indicators = move |_| {
@@ -137,8 +101,12 @@ pub fn LandingPage() -> impl IntoView {
             :root {
                 --neon-red: #ff3333;
                 --neon-orange: #ff6b35;
+                --neon-gold: #666600;
+                --neon-gold-light: #999900;
                 --bg-black: #000000;
                 --border-dim: #1a1a1a;
+                --neon-glow: 0 0 20px rgba(255, 107, 53, 0.5);
+                --gold-glow: 0 0 20px rgba(153, 153, 0, 0.5);
             }
 
             * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -152,7 +120,7 @@ pub fn LandingPage() -> impl IntoView {
 
             .landing-nav {
                 padding: 20px 32px;
-                border-bottom: 1px solid var(--border-dim);
+                border-bottom: 2px solid var(--neon-gold);
                 display: flex;
                 justify-content: space-between;
                 align-items: center;
@@ -161,54 +129,69 @@ pub fn LandingPage() -> impl IntoView {
                 position: sticky;
                 top: 0;
                 z-index: 1000;
+                box-shadow: var(--gold-glow);
             }
 
             .logo {
                 font-size: 24px;
                 font-weight: 900;
-                background: linear-gradient(135deg, #ff3333, #ff6b35);
+                background: linear-gradient(135deg, #ff3333, #ff6b35, #999900);
                 -webkit-background-clip: text;
                 -webkit-text-fill-color: transparent;
-                animation: pulse 3s ease-in-out infinite;
+                animation: pulse-glow 3s ease-in-out infinite;
+                text-shadow: var(--neon-glow);
             }
 
-            @keyframes pulse {
-                0%, 100% { filter: brightness(1); }
-                50% { filter: brightness(1.3); }
+            @keyframes pulse-glow {
+                0%, 100% {
+                    filter: brightness(1) drop-shadow(0 0 5px rgba(255, 107, 53, 0.5));
+                }
+                50% {
+                    filter: brightness(1.4) drop-shadow(0 0 20px rgba(153, 153, 0, 0.8));
+                }
             }
 
             .nav-buttons {
                 display: flex;
                 gap: 12px;
+                align-items: center;
             }
 
             .hero {
-                padding: 60px 32px;
+                padding: 60px 32px 40px;
                 text-align: center;
             }
 
             h1 {
                 font-size: 64px;
                 margin-bottom: 20px;
-                background: linear-gradient(135deg, #fff, #888);
+                background: linear-gradient(135deg, #fff, #999900, #ff6b35);
                 -webkit-background-clip: text;
                 -webkit-text-fill-color: transparent;
+                text-shadow: 0 0 30px rgba(153, 153, 0, 0.5);
+                animation: shimmer 3s ease-in-out infinite;
+            }
+
+            @keyframes shimmer {
+                0%, 100% { filter: brightness(1); }
+                50% { filter: brightness(1.3); }
             }
 
             .sub {
-                color: #888;
+                color: #999900;
                 font-size: 18px;
                 max-width: 700px;
                 margin: 0 auto 40px;
+                text-shadow: 0 0 10px rgba(153, 153, 0, 0.5);
             }
 
             .btn {
                 display: inline-block;
                 padding: 14px 28px;
                 margin: 10px;
-                border: 1px solid #4a4a4a;
+                border: 2px solid #666600;
                 border-radius: 10px;
-                color: #fff;
+                color: #999900;
                 text-decoration: none;
                 font-size: 12px;
                 font-weight: 600;
@@ -217,18 +200,34 @@ pub fn LandingPage() -> impl IntoView {
                 transition: all 0.3s;
                 cursor: pointer;
                 background: transparent;
+                box-shadow: 0 0 10px rgba(102, 102, 0, 0.3);
             }
 
             .btn:hover {
                 border-color: #ff6b35;
-                box-shadow: 0 0 20px rgba(255, 107, 53, 0.4);
+                color: #ff6b35;
+                box-shadow: 0 0 30px rgba(255, 107, 53, 0.6);
                 transform: translateY(-2px);
+                text-shadow: 0 0 10px rgba(255, 107, 53, 0.8);
             }
 
             .btn-primary {
                 background: linear-gradient(135deg, #ff3333, #ff6b35);
-                border: none;
+                border: 2px solid #ff6b35;
                 color: #000;
+                box-shadow: 0 0 20px rgba(255, 107, 53, 0.5);
+            }
+
+            .btn-primary:hover {
+                box-shadow: 0 0 40px rgba(255, 107, 53, 0.8);
+            }
+
+            .wallet-nav-section {
+                display: flex;
+                align-items: center;
+                margin-left: auto;
+                padding-left: 20px;
+                border-left: 1px solid var(--neon-gold);
             }
 
             .chart-container {
@@ -245,32 +244,42 @@ pub fn LandingPage() -> impl IntoView {
             }
 
             .asset-btn {
-                padding: 12px 24px;
-                border: 2px solid var(--border-dim);
+                padding: 14px 28px;
+                border: 2px solid #666600;
                 background: rgba(0, 0, 0, 0.8);
-                color: #888;
-                border-radius: 8px;
+                color: #999900;
+                border-radius: 10px;
                 cursor: pointer;
                 font-family: inherit;
                 font-size: 14px;
-                font-weight: 600;
-                letter-spacing: 0.1em;
+                font-weight: 700;
+                letter-spacing: 0.15em;
                 text-transform: uppercase;
                 transition: all 0.3s;
+                box-shadow: 0 0 15px rgba(102, 102, 0, 0.4);
             }
 
-            .asset-btn:hover, .asset-btn.active {
-                border-color: var(--neon-orange);
-                color: #fff;
-                box-shadow: 0 0 15px rgba(255, 107, 53, 0.3);
+            .asset-btn:hover {
+                border-color: #ff6b35;
+                color: #ff6b35;
+                box-shadow: 0 0 25px rgba(255, 107, 53, 0.6);
+                transform: translateY(-2px);
+            }
+
+            .asset-btn.active {
+                border-color: #ff3333;
+                color: #ff3333;
+                background: rgba(255, 51, 51, 0.1);
+                box-shadow: 0 0 30px rgba(255, 51, 51, 0.7);
+                text-shadow: 0 0 15px rgba(255, 51, 51, 0.8);
             }
 
             .tradingview-widget-container {
                 background: #000;
                 border-radius: 16px;
                 overflow: hidden;
-                border: 1px solid var(--border-dim);
-                box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+                border: 2px solid #666600;
+                box-shadow: 0 20px 60px rgba(0, 0, 0, 0.8), var(--gold-glow);
             }
 
             .ai-section {
@@ -289,91 +298,41 @@ pub fn LandingPage() -> impl IntoView {
             .ai-title {
                 font-size: 24px;
                 font-weight: 800;
-                background: linear-gradient(135deg, #ff3333, #ff6b35);
+                background: linear-gradient(135deg, #ff3333, #ff6b35, #999900);
                 -webkit-background-clip: text;
                 -webkit-text-fill-color: transparent;
+                text-shadow: 0 0 20px rgba(153, 153, 0, 0.5);
             }
 
             .ai-analysis-box {
                 background: linear-gradient(135deg, rgba(20, 20, 20, 0.8), rgba(10, 10, 10, 0.9));
-                border: 1px solid var(--border-dim);
+                border: 2px solid #666600;
                 border-radius: 16px;
                 padding: 32px;
                 min-height: 200px;
                 white-space: pre-wrap;
                 line-height: 1.6;
-                color: #ccc;
+                color: #999900;
+                box-shadow: var(--gold-glow);
             }
 
             .error-message {
                 color: var(--neon-red);
                 text-align: center;
                 padding: 20px;
+                text-shadow: 0 0 10px rgba(255, 51, 51, 0.8);
             }
 
             .loading {
-                color: var(--neon-orange);
+                color: #ff6b35;
                 text-align: center;
                 animation: blink 1.5s infinite;
+                text-shadow: 0 0 10px rgba(255, 107, 53, 0.8);
             }
 
             @keyframes blink {
                 0%, 100% { opacity: 1; }
                 50% { opacity: 0.5; }
-            }
-
-            .wallet-section {
-                max-width: 900px;
-                margin: 20px auto;
-                padding: 0 32px;
-            }
-
-            .wallet-buttons {
-                display: flex;
-                justify-content: center;
-                gap: 12px;
-                flex-wrap: wrap;
-            }
-
-            .wallet-btn {
-                padding: 12px 20px;
-                border: 2px solid var(--border-dim);
-                background: rgba(0, 0, 0, 0.8);
-                color: #fff;
-                border-radius: 8px;
-                cursor: pointer;
-                font-family: inherit;
-                font-size: 12px;
-                font-weight: 600;
-                letter-spacing: 0.05em;
-                text-transform: uppercase;
-                transition: all 0.3s;
-            }
-
-            .wallet-btn:hover {
-                transform: translateY(-2px);
-                box-shadow: 0 4px 12px rgba(255, 107, 53, 0.3);
-            }
-
-            .wallet-btn.metamask:hover { border-color: #f6851b; }
-            .wallet-btn.phantom:hover { border-color: #ab9ff2; }
-            .wallet-btn.jupiter:hover { border-color: #ff9800; }
-            .wallet-btn.walletconnect:hover { border-color: #3b99fc; }
-
-            .wallet-connected {
-                display: flex;
-                justify-content: center;
-                align-items: center;
-                gap: 16px;
-                padding: 16px;
-                background: linear-gradient(135deg, rgba(20, 20, 20, 0.8), rgba(10, 10, 10, 0.9));
-                border: 1px solid var(--neon-orange);
-                border-radius: 12px;
-            }
-
-            .wallet-info {
-                color: var(--neon-orange);
-                font-weight: 600;
             }
 
             .wallet-dropdown {
@@ -386,9 +345,9 @@ pub fn LandingPage() -> impl IntoView {
                 align-items: center;
                 gap: 8px;
                 padding: 12px 20px;
-                border: 2px solid var(--neon-orange);
+                border: 2px solid #666600;
                 background: rgba(0, 0, 0, 0.8);
-                color: #fff;
+                color: #999900;
                 border-radius: 8px;
                 cursor: pointer;
                 font-family: inherit;
@@ -397,12 +356,15 @@ pub fn LandingPage() -> impl IntoView {
                 letter-spacing: 0.05em;
                 text-transform: uppercase;
                 transition: all 0.3s;
+                box-shadow: 0 0 15px rgba(102, 102, 0, 0.4);
             }
 
             .wallet-dropdown-btn:hover {
+                border-color: #ff6b35;
+                color: #ff6b35;
                 background: rgba(255, 107, 53, 0.1);
                 transform: translateY(-2px);
-                box-shadow: 0 4px 12px rgba(255, 107, 53, 0.3);
+                box-shadow: 0 0 25px rgba(255, 107, 53, 0.6);
             }
 
             .dropdown-arrow {
@@ -420,10 +382,10 @@ pub fn LandingPage() -> impl IntoView {
                 top: calc(100% + 8px);
                 left: 0;
                 background: rgba(10, 10, 10, 0.98);
-                border: 1px solid var(--border-dim);
+                border: 2px solid #666600;
                 border-radius: 12px;
                 min-width: 220px;
-                box-shadow: 0 10px 40px rgba(0, 0, 0, 0.8);
+                box-shadow: 0 10px 40px rgba(0, 0, 0, 0.8), var(--gold-glow);
                 z-index: 1000;
                 overflow: hidden;
             }
@@ -437,8 +399,9 @@ pub fn LandingPage() -> impl IntoView {
                 cursor: pointer;
                 font-size: 13px;
                 font-weight: 500;
-                border-bottom: 1px solid var(--border-dim);
+                border-bottom: 1px solid #666600;
                 transition: all 0.2s;
+                color: #999900;
             }
 
             .dropdown-item:last-child {
@@ -446,7 +409,9 @@ pub fn LandingPage() -> impl IntoView {
             }
 
             .dropdown-item:hover {
-                background: rgba(255, 107, 53, 0.1);
+                background: rgba(255, 107, 53, 0.15);
+                color: #ff6b35;
+                text-shadow: 0 0 10px rgba(255, 107, 53, 0.8);
             }
         "#}</Style>
 
@@ -455,41 +420,39 @@ pub fn LandingPage() -> impl IntoView {
             <div class="nav-buttons">
                 <a href="/auth/login" class="btn">"Login"</a>
                 <a href="/auth/register" class="btn btn-primary">"Register"</a>
+                <div class="wallet-nav-section">
+                    {move || {
+                        if wallet_connected.get() {
+                            view! {
+                                <div class="wallet-dropdown">
+                                    <button class="wallet-dropdown-btn" on:click=toggle_wallet_dropdown>
+                                        {format!("{}: {}", wallet_type.get(), wallet_address.get())}
+                                        <span class="dropdown-arrow">"▼"</span>
+                                    </button>
+                                    <div class="wallet-dropdown-menu" class:open=wallet_dropdown_open>
+                                        <div class="dropdown-item" on:click=disconnect_wallet>"Disconnect"</div>
+                                    </div>
+                                </div>
+                            }.into_view()
+                        } else {
+                            view! {
+                                <div class="wallet-dropdown" class:open=wallet_dropdown_open>
+                                    <button class="wallet-dropdown-btn" on:click=toggle_wallet_dropdown>
+                                        "Connect Wallet"
+                                        <span class="dropdown-arrow">"▼"</span>
+                                    </button>
+                                    <div class="wallet-dropdown-menu">
+                                        <div class="dropdown-item" on:click=connect_metamask>"🦊 MetaMask"</div>
+                                        <div class="dropdown-item" on:click=connect_phantom>"👻 Phantom"</div>
+                                        <div class="dropdown-item" on:click=connect_jupiter>"🪐 Jupiter"</div>
+                                        <div class="dropdown-item" on:click=connect_walletconnect>"🔗 WalletConnect"</div>
+                                    </div>
+                                </div>
+                            }.into_view()
+                        }
+                    }}
+                </div>
             </div>
-        </div>
-
-        // Wallet connection section
-        <div class="wallet-section">
-            {move || {
-                if wallet_connected.get() {
-                    view! {
-                        <div class="wallet-dropdown">
-                            <button class="wallet-dropdown-btn" on:click=toggle_wallet_dropdown>
-                                {format!("{}: {}", wallet_type.get(), wallet_address.get())}
-                                <span class="dropdown-arrow">"▼"</span>
-                            </button>
-                            <div class="wallet-dropdown-menu" class:open=wallet_dropdown_open>
-                                <div class="dropdown-item" on:click=disconnect_wallet>"Disconnect"</div>
-                            </div>
-                        </div>
-                    }.into_view()
-                } else {
-                    view! {
-                        <div class="wallet-dropdown" class:open=wallet_dropdown_open>
-                            <button class="wallet-dropdown-btn" on:click=toggle_wallet_dropdown>
-                                "Connect Wallet"
-                                <span class="dropdown-arrow">"▼"</span>
-                            </button>
-                            <div class="wallet-dropdown-menu">
-                                <div class="dropdown-item" on:click=connect_metamask>"🦊 MetaMask"</div>
-                                <div class="dropdown-item" on:click=connect_phantom>"👻 Phantom"</div>
-                                <div class="dropdown-item" on:click=connect_jupiter>"🪐 Jupiter"</div>
-                                <div class="dropdown-item" on:click=connect_walletconnect>"🔗 WalletConnect"</div>
-                            </div>
-                        </div>
-                    }.into_view()
-                }
-            }}
         </div>
 
         <div class="hero">
@@ -534,12 +497,54 @@ pub fn LandingPage() -> impl IntoView {
                 </button>
             </div>
 
-            <iframe
-                srcdoc=tradingview_html
-                class="tradingview-widget-container"
-                style="height:500px;width:100%;border:none;border-radius:16px;"
-                sandbox="allow-scripts allow-same-origin"
-            ></iframe>
+            {move || {
+                let symbol = tradingview_symbol();
+                let key = widget_key.get();
+                let html = format!(r#"
+                    <!DOCTYPE html>
+                    <html>
+                    <head>
+                        <meta charset="utf-8">
+                        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                        <style>
+                            body, html {{ margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; }}
+                            .tradingview-widget-container {{ width: 100%; height: 100%; }}
+                        </style>
+                    </head>
+                    <body>
+                        <div class="tradingview-widget-container">
+                            <div class="tradingview-widget-container__widget"></div>
+                            <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-advanced-chart.js" async>
+                            {{
+                                "autosize": true,
+                                "symbol": "{}",
+                                "interval": "D",
+                                "timezone": "Etc/UTC",
+                                "theme": "dark",
+                                "style": "1",
+                                "locale": "en",
+                                "enable_publishing": false,
+                                "hide_side_toolbar": false,
+                                "allow_symbol_change": true,
+                                "calendar": false,
+                                "support_host": "https://www.tradingview.com"
+                            }}
+                            <\/script>
+                        </div>
+                    </body>
+                    </html>
+                "#, symbol);
+
+                view! {
+                    <iframe
+                        srcdoc={html}
+                        class="tradingview-widget-container"
+                        style="height:500px;width:100%;border:none;border-radius:16px;"
+                        sandbox="allow-scripts allow-same-origin"
+                        key={format!("tv-{}", key)}
+                    ></iframe>
+                }
+            }}
         </div>
 
         <div class="ai-section">
