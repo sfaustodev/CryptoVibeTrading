@@ -18,7 +18,8 @@ pub fn LandingPage() -> impl IntoView {
 
     // Toggle wallet dropdown
     let toggle_wallet_dropdown = move |_| {
-        set_wallet_dropdown_open.update(|open| !open);
+        let current = wallet_dropdown_open.get();
+        set_wallet_dropdown_open.set(!current);
     };
 
     // Connect wallet handlers
@@ -56,9 +57,10 @@ pub fn LandingPage() -> impl IntoView {
         set_wallet_type.set(String::new());
     };
 
-    // TradingView widget integration - reactive with key
+    // TradingView widget integration - reactive iframe that properly reloads
     let (widget_key, set_widget_key) = create_signal(0);
-    let tradingview_widget = move || {
+
+    let tradingview_html = move || {
         let symbol = match current_asset.get().as_str() {
             "BTC" => "BINANCE:BTCUSDT",
             "SOL" => "BINANCE:SOLUSDT",
@@ -66,29 +68,42 @@ pub fn LandingPage() -> impl IntoView {
             _ => "BINANCE:BTCUSDT",
         };
 
-        let _ = widget_key.get(); // Create dependency
+        let _ = widget_key.get(); // Create reactive dependency
 
         format!(r#"
-            <div class="tradingview-widget-container" style="height:500px;width:100%" key="{}">
-                <div class="tradingview-widget-container__widget"></div>
-                <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-advanced-chart.js" async>
-                {{
-                    "autosize": true,
-                    "symbol": "{}",
-                    "interval": "D",
-                    "timezone": "Etc/UTC",
-                    "theme": "dark",
-                    "style": "1",
-                    "locale": "en",
-                    "enable_publishing": false,
-                    "hide_side_toolbar": false,
-                    "allow_symbol_change": true,
-                    "calendar": false,
-                    "support_host": "https://www.tradingview.com"
-                }}
-                <\/script>
-            </div>
-        "#, widget_key.get(), symbol)
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <meta charset="utf-8">
+                <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                <style>
+                    body, html {{ margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; }}
+                    .tradingview-widget-container {{ width: 100%; height: 100%; }}
+                </style>
+            </head>
+            <body>
+                <div class="tradingview-widget-container">
+                    <div class="tradingview-widget-container__widget"></div>
+                    <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-advanced-chart.js" async>
+                    {{
+                        "autosize": true,
+                        "symbol": "{}",
+                        "interval": "D",
+                        "timezone": "Etc/UTC",
+                        "theme": "dark",
+                        "style": "1",
+                        "locale": "en",
+                        "enable_publishing": false,
+                        "hide_side_toolbar": false,
+                        "allow_symbol_change": true,
+                        "calendar": false,
+                        "support_host": "https://www.tradingview.com"
+                    }}
+                    <\/script>
+                </div>
+            </body>
+            </html>
+        "#, symbol)
     };
 
     let analyze_indicators = move |_| {
@@ -519,7 +534,12 @@ pub fn LandingPage() -> impl IntoView {
                 </button>
             </div>
 
-            <div inner_html=tradingview_widget></div>
+            <iframe
+                srcdoc=tradingview_html
+                class="tradingview-widget-container"
+                style="height:500px;width:100%;border:none;border-radius:16px;"
+                sandbox="allow-scripts allow-same-origin"
+            ></iframe>
         </div>
 
         <div class="ai-section">
