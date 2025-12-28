@@ -14,34 +14,40 @@ pub fn LandingPage() -> impl IntoView {
     let (wallet_connected, set_wallet_connected) = create_signal(false);
     let (wallet_address, set_wallet_address) = create_signal(String::new());
     let (wallet_type, set_wallet_type) = create_signal(String::new());
+    let (wallet_dropdown_open, set_wallet_dropdown_open) = create_signal(false);
+
+    // Toggle wallet dropdown
+    let toggle_wallet_dropdown = move |_| {
+        set_wallet_dropdown_open.update(|open| !open);
+    };
 
     // Connect wallet handlers
     let connect_metamask = move |_| {
-        // TODO: Implement MetaMask connection with JS interop
         set_wallet_type.set("MetaMask".to_string());
-        set_wallet_address.set("0x1234...5678".to_string()); // Demo address
+        set_wallet_address.set("0x1234...5678".to_string());
         set_wallet_connected.set(true);
+        set_wallet_dropdown_open.set(false);
     };
 
     let connect_phantom = move |_| {
-        // TODO: Implement Phantom connection with Solana web3.js
         set_wallet_type.set("Phantom".to_string());
-        set_wallet_address.set("Solana...Demo".to_string()); // Demo address
+        set_wallet_address.set("Solana...Demo".to_string());
         set_wallet_connected.set(true);
+        set_wallet_dropdown_open.set(false);
     };
 
     let connect_jupiter = move |_| {
-        // TODO: Implement Jupiter aggregator connection
         set_wallet_type.set("Jupiter".to_string());
-        set_wallet_address.set("Solana...Jupiter".to_string()); // Demo address
+        set_wallet_address.set("Solana...Jupiter".to_string());
         set_wallet_connected.set(true);
+        set_wallet_dropdown_open.set(false);
     };
 
     let connect_walletconnect = move |_| {
-        // TODO: Implement WalletConnect
         set_wallet_type.set("WalletConnect".to_string());
-        set_wallet_address.set("wc...1234".to_string()); // Demo address
+        set_wallet_address.set("wc...1234".to_string());
         set_wallet_connected.set(true);
+        set_wallet_dropdown_open.set(false);
     };
 
     let disconnect_wallet = move |_| {
@@ -354,6 +360,79 @@ pub fn LandingPage() -> impl IntoView {
                 color: var(--neon-orange);
                 font-weight: 600;
             }
+
+            .wallet-dropdown {
+                position: relative;
+                display: inline-block;
+            }
+
+            .wallet-dropdown-btn {
+                display: flex;
+                align-items: center;
+                gap: 8px;
+                padding: 12px 20px;
+                border: 2px solid var(--neon-orange);
+                background: rgba(0, 0, 0, 0.8);
+                color: #fff;
+                border-radius: 8px;
+                cursor: pointer;
+                font-family: inherit;
+                font-size: 12px;
+                font-weight: 600;
+                letter-spacing: 0.05em;
+                text-transform: uppercase;
+                transition: all 0.3s;
+            }
+
+            .wallet-dropdown-btn:hover {
+                background: rgba(255, 107, 53, 0.1);
+                transform: translateY(-2px);
+                box-shadow: 0 4px 12px rgba(255, 107, 53, 0.3);
+            }
+
+            .dropdown-arrow {
+                font-size: 10px;
+                transition: transform 0.3s;
+            }
+
+            .wallet-dropdown.open .dropdown-arrow {
+                transform: rotate(180deg);
+            }
+
+            .wallet-dropdown-menu {
+                display: none;
+                position: absolute;
+                top: calc(100% + 8px);
+                left: 0;
+                background: rgba(10, 10, 10, 0.98);
+                border: 1px solid var(--border-dim);
+                border-radius: 12px;
+                min-width: 220px;
+                box-shadow: 0 10px 40px rgba(0, 0, 0, 0.8);
+                z-index: 1000;
+                overflow: hidden;
+            }
+
+            .wallet-dropdown.open .wallet-dropdown-menu {
+                display: block;
+            }
+
+            .dropdown-item {
+                padding: 14px 18px;
+                cursor: pointer;
+                font-size: 13px;
+                font-weight: 500;
+                border-bottom: 1px solid var(--border-dim);
+                transition: all 0.2s;
+            }
+
+            .dropdown-item:last-child {
+                border-bottom: none;
+            }
+
+            .dropdown-item:hover {
+                background: rgba(255, 107, 53, 0.1);
+            }
         "#}</Style>
 
         <div class="landing-nav">
@@ -369,28 +448,29 @@ pub fn LandingPage() -> impl IntoView {
             {move || {
                 if wallet_connected.get() {
                     view! {
-                        <div class="wallet-connected">
-                            <span class="wallet-info">
+                        <div class="wallet-dropdown">
+                            <button class="wallet-dropdown-btn" on:click=toggle_wallet_dropdown>
                                 {format!("{}: {}", wallet_type.get(), wallet_address.get())}
-                            </span>
-                            <button class="btn" on:click=disconnect_wallet>"Disconnect"</button>
+                                <span class="dropdown-arrow">"▼"</span>
+                            </button>
+                            <div class="wallet-dropdown-menu" class:open=wallet_dropdown_open>
+                                <div class="dropdown-item" on:click=disconnect_wallet>"Disconnect"</div>
+                            </div>
                         </div>
                     }.into_view()
                 } else {
                     view! {
-                        <div class="wallet-buttons">
-                            <button class="wallet-btn metamask" on:click=connect_metamask>
-                                "🦊 MetaMask"
+                        <div class="wallet-dropdown" class:open=wallet_dropdown_open>
+                            <button class="wallet-dropdown-btn" on:click=toggle_wallet_dropdown>
+                                "Connect Wallet"
+                                <span class="dropdown-arrow">"▼"</span>
                             </button>
-                            <button class="wallet-btn phantom" on:click=connect_phantom>
-                                "👻 Phantom"
-                            </button>
-                            <button class="wallet-btn jupiter" on:click=connect_jupiter>
-                                "🪐 Jupiter"
-                            </button>
-                            <button class="wallet-btn walletconnect" on:click=connect_walletconnect>
-                                "🔗 WalletConnect"
-                            </button>
+                            <div class="wallet-dropdown-menu">
+                                <div class="dropdown-item" on:click=connect_metamask>"🦊 MetaMask"</div>
+                                <div class="dropdown-item" on:click=connect_phantom>"👻 Phantom"</div>
+                                <div class="dropdown-item" on:click=connect_jupiter>"🪐 Jupiter"</div>
+                                <div class="dropdown-item" on:click=connect_walletconnect>"🔗 WalletConnect"</div>
+                            </div>
                         </div>
                     }.into_view()
                 }
