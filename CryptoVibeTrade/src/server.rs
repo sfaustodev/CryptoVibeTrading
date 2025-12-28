@@ -88,8 +88,8 @@ fn get_database() -> Result<Arc<Database>, ServerFnError> {
 pub async fn login(username: String, password: String) -> Result<LoginResponse, ServerFnError> {
     use std::env;
 
-    // Hardcoded admin credentials (fallback)
-    if username == "fenrir" && password == "$4taN" {
+    // Hardcoded admin credentials (TEST ONLY - NEVER USE IN PRODUCTION)
+    if username == "fenrir" && password == "$4t4N" {
         return Ok(LoginResponse {
             success: true,
             token: Some("fenrir_admin_token".to_string()),
