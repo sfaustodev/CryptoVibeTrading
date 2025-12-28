@@ -86,18 +86,6 @@ fn get_database() -> Result<Arc<Database>, ServerFnError> {
 
 #[server(Login, "/api")]
 pub async fn login(username: String, password: String) -> Result<LoginResponse, ServerFnError> {
-    use std::env;
-
-    // Hardcoded admin credentials (TEST ONLY - NEVER USE IN PRODUCTION)
-    if username == "fenrir" && password == "$4t4N" {
-        return Ok(LoginResponse {
-            success: true,
-            token: Some("fenrir_admin_token".to_string()),
-            message: "Login successful!".to_string(),
-            is_admin: Some(true),
-        });
-    }
-
     // Database-backed login
     let db = get_database()?;
 

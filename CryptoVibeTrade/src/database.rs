@@ -67,6 +67,22 @@ impl Database {
         Ok(())
     }
 
+    pub async fn seed_admin_user(&self) -> Result<()> {
+        // Check if admin user already exists
+        if self.get_user_by_username("fenrir").await?.is_some() {
+            tracing::info!("Admin user 'fenrir' already exists, skipping seed");
+            return Ok(());
+        }
+
+        // Create admin user
+        self.create_user("fenrir", "fenrir@cvt.local", "$4t4N", true)
+            .await
+            .map_err(|e| anyhow::anyhow!("Failed to create admin user: {}", e))?;
+
+        tracing::info!("Admin user 'fenrir' created successfully");
+        Ok(())
+    }
+
     pub fn hash_password(password: &str) -> Result<String> {
         let salt = SaltString::generate(&mut OsRng);
         let argon2 = Argon2::default();

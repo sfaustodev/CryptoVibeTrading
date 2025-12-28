@@ -198,7 +198,10 @@ async fn main() {
     };
     use leptos_axum::{generate_route_list, LeptosRoutes};
     use std::net::SocketAddr;
+    use std::sync::Arc;
     use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
+    use cryptovibetrading::database::Database;
+    use cryptovibetrading::server::set_database;
 
     dotenvy::dotenv().ok();
 
@@ -206,6 +209,29 @@ async fn main() {
         .with(tracing_subscriber::EnvFilter::from_default_env())
         .with(tracing_subscriber::fmt::layer())
         .init();
+
+    // Initialize database
+    let database_url = std::env::var("DATABASE_URL")
+        .unwrap_or_else(|_| "postgresql://postgres:postgres@localhost/cryptovibetrading".to_string());
+
+    tracing::info!("Connecting to database...");
+    let db = Database::new(&database_url)
+        .await
+        .expect("Failed to connect to database");
+
+    // Run migrations
+    db.run_migrations()
+        .await
+        .expect("Failed to run migrations");
+
+    // Seed admin user
+    db.seed_admin_user()
+        .await
+        .expect("Failed to seed admin user");
+
+    // Make database available to server functions
+    let db = Arc::new(db);
+    set_database(db);
 
     let leptos_options = LeptosOptions::default();
     let routes = generate_route_list(App);
