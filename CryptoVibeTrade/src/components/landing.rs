@@ -1,14 +1,44 @@
 use leptos::*;
 use leptos_meta::*;
 use leptos_router::*;
-use crate::server::ai_analyze;
+
+#[derive(Clone, Copy)]
+struct TradingPair {
+    code: &'static str,
+    label: &'static str,
+    symbol: &'static str,
+}
+
+const TRADING_PAIRS: [TradingPair; 3] = [
+    TradingPair {
+        code: "BTCUSDT",
+        label: "BTC/USDT",
+        symbol: "BINANCE:BTCUSDT",
+    },
+    TradingPair {
+        code: "SOLUSDT",
+        label: "SOL/USDT",
+        symbol: "BINANCE:SOLUSDT",
+    },
+    TradingPair {
+        code: "ZECUSDT",
+        label: "ZEC/USDT",
+        symbol: "BINANCE:ZECUSDT",
+    },
+];
+
+fn find_pair(code: &str) -> TradingPair {
+    TRADING_PAIRS
+        .iter()
+        .copied()
+        .find(|pair| pair.code == code)
+        .unwrap_or(TRADING_PAIRS[0])
+}
 
 #[component]
 pub fn LandingPage() -> impl IntoView {
-    let (current_asset, set_current_asset) = create_signal("BTC".to_string());
-    let (ai_analysis, set_ai_analysis) = create_signal("".to_string());
-    let (is_analyzing, set_is_analyzing) = create_signal(false);
-    let (error_message, set_error_message) = create_signal(String::new());
+    let navigate = use_navigate();
+    let (current_pair, set_current_pair) = create_signal("BTCUSDT".to_string());
 
     // Wallet connection state
     let (wallet_connected, set_wallet_connected) = create_signal(false);
@@ -62,38 +92,13 @@ pub fn LandingPage() -> impl IntoView {
 
     let tradingview_symbol = move || {
         let _ = widget_key.get(); // Reactive dependency
-        match current_asset.get().as_str() {
-            "BTC" => "BINANCE:BTCUSDT",
-            "SOL" => "BINANCE:SOLUSDT",
-            "ZEC" => "BINANCE:ZECUSDT",
-            _ => "BINANCE:BTCUSDT",
-        }
+        find_pair(&current_pair.get()).symbol
     };
 
-    let analyze_indicators = move |_| {
-        set_is_analyzing.set(true);
-        set_error_message.set(String::new());
-        set_ai_analysis.set(String::new());
+    let current_pair_label = move || find_pair(&current_pair.get()).label;
 
-        let asset = current_asset.get();
-        let indicators = "Ichimoku Cloud, RSI, MACD, Bollinger Bands, Volume".to_string();
-
-        spawn_local(async move {
-            match ai_analyze(
-                "Analyze the current market conditions and provide technical analysis.".to_string(),
-                asset.clone(),
-                indicators.clone(),
-            ).await {
-                Ok(response) => {
-                    set_ai_analysis.set(response);
-                    // Note: Voice synthesis requires JavaScript integration
-                }
-                Err(e) => {
-                    set_error_message.set(format!("AI Analysis failed: {}", e));
-                }
-            }
-            set_is_analyzing.set(false);
-        });
+    let summon_dragrok = move |_| {
+        navigate(&"/whiteboard".to_string(), Default::default());
     };
 
     view! {
@@ -282,6 +287,25 @@ pub fn LandingPage() -> impl IntoView {
                 box-shadow: 0 20px 60px rgba(0, 0, 0, 0.8), var(--gold-glow);
             }
 
+            .pair-label {
+                text-align: center;
+                margin-bottom: 12px;
+                font-size: 14px;
+                letter-spacing: 0.2em;
+                text-transform: uppercase;
+                color: #ff6b35;
+                text-shadow: 0 0 10px rgba(255, 107, 53, 0.6);
+            }
+
+            .pair-subtext {
+                text-align: center;
+                color: #666600;
+                font-size: 11px;
+                margin-bottom: 18px;
+                letter-spacing: 0.2em;
+                text-transform: uppercase;
+            }
+
             .ai-section {
                 max-width: 900px;
                 margin: 60px auto;
@@ -316,24 +340,6 @@ pub fn LandingPage() -> impl IntoView {
                 box-shadow: var(--gold-glow);
             }
 
-            .error-message {
-                color: var(--neon-red);
-                text-align: center;
-                padding: 20px;
-                text-shadow: 0 0 10px rgba(255, 51, 51, 0.8);
-            }
-
-            .loading {
-                color: #ff6b35;
-                text-align: center;
-                animation: blink 1.5s infinite;
-                text-shadow: 0 0 10px rgba(255, 107, 53, 0.8);
-            }
-
-            @keyframes blink {
-                0%, 100% { opacity: 1; }
-                50% { opacity: 0.5; }
-            }
 
             .wallet-dropdown {
                 position: relative;
@@ -465,37 +471,29 @@ pub fn LandingPage() -> impl IntoView {
 
         <div class="chart-container">
             <div class="asset-selector">
-                <button
-                    class="asset-btn"
-                    class:active=move || current_asset.get() == "BTC"
-                    on:click=move |_| {
-                        set_current_asset.set("BTC".to_string());
-                        set_widget_key.update(|k| *k += 1);
+                <For
+                    each=|| TRADING_PAIRS.iter().copied()
+                    key=|pair| pair.code
+                    children=move |pair| {
+                        let pair_code = pair.code;
+                        let label = pair.label;
+                        view! {
+                            <button
+                                class="asset-btn"
+                                class:active=move || current_pair.get() == pair_code
+                                on:click=move |_| {
+                                    set_current_pair.set(pair_code.to_string());
+                                    set_widget_key.update(|k| *k += 1);
+                                }
+                            >
+                                {label}
+                            </button>
+                        }
                     }
-                >
-                    "BTC"
-                </button>
-                <button
-                    class="asset-btn"
-                    class:active=move || current_asset.get() == "SOL"
-                    on:click=move |_| {
-                        set_current_asset.set("SOL".to_string());
-                        set_widget_key.update(|k| *k += 1);
-                    }
-                >
-                    "SOL"
-                </button>
-                <button
-                    class="asset-btn"
-                    class:active=move || current_asset.get() == "ZEC"
-                    on:click=move |_| {
-                        set_current_asset.set("ZEC".to_string());
-                        set_widget_key.update(|k| *k += 1);
-                    }
-                >
-                    "ZEC"
-                </button>
+                />
             </div>
+            <div class="pair-label">{move || current_pair_label()}</div>
+            <div class="pair-subtext">"Live Binance spot data via free TradingView widget"</div>
 
             {move || {
                 let symbol = tradingview_symbol();
@@ -549,30 +547,24 @@ pub fn LandingPage() -> impl IntoView {
 
         <div class="ai-section">
             <div class="ai-header">
-                <div class="ai-title">"🤖 Fenrir AI Analysis"</div>
+                <div class="ai-title">"🐲 Dragrok Command Center"</div>
                 <button
                     class="btn btn-primary"
-                    on:click=analyze_indicators
-                    disabled=is_analyzing
+                    on:click=summon_dragrok
                 >
-                    {move || if is_analyzing.get() { "Analyzing..." } else { "AI Analysis" }}
+                    "DRAGROK"
                 </button>
             </div>
 
             <div class="ai-analysis-box">
-                {move || {
-                    if !error_message.get().is_empty() {
-                        let msg = error_message.get();
-                        view! { <div class="error-message">{msg}</div> }
-                    } else if is_analyzing.get() {
-                        view! { <div class="loading">"🔄 AI is analyzing the market..."</div> }
-                    } else if ai_analysis.get().is_empty() {
-                        view! { <div style="color:#666">"Press the button above to start."</div> }
-                    } else {
-                        let analysis = ai_analysis.get();
-                        view! { <div>{analysis}</div> }
-                    }
-                }}
+                <div>
+                    <div style="font-weight:700; margin-bottom: 12px;">
+                        "Summon Dragrok to the whiteboard."
+                    </div>
+                    <div style="color:#999;">
+                        "Open the tactical whiteboard workspace to collaborate with Dragrok on your trading plan."
+                    </div>
+                </div>
             </div>
         </div>
     }
