@@ -1,10 +1,10 @@
+use anyhow::Result;
+use argon2::password_hash::{rand_core::OsRng, SaltString};
+use argon2::{Argon2, PasswordHash, PasswordHasher, PasswordVerifier};
+use chrono::{DateTime, NaiveDate, Utc};
+use serde::{Deserialize, Serialize};
 use sqlx::{PgPool, Row};
 use uuid::Uuid;
-use chrono::{DateTime, Utc};
-use argon2::{Argon2, PasswordHash, PasswordHasher, PasswordVerifier};
-use argon2::password_hash::{SaltString, rand_core::OsRng};
-use anyhow::Result;
-use serde::{Serialize, Deserialize};
 
 pub struct Database {
     pool: PgPool,
@@ -23,12 +23,18 @@ impl Database {
                 id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
                 username VARCHAR(100) UNIQUE NOT NULL,
                 email VARCHAR(255) UNIQUE NOT NULL,
+                full_name VARCHAR(255),
+                birth_date DATE,
                 password_hash TEXT NOT NULL,
                 is_admin BOOLEAN DEFAULT FALSE NOT NULL,
                 is_active BOOLEAN DEFAULT TRUE NOT NULL,
                 created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL,
                 updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL
             );
+
+            ALTER TABLE users
+                ADD COLUMN IF NOT EXISTS full_name VARCHAR(255),
+                ADD COLUMN IF NOT EXISTS birth_date DATE;
 
             CREATE INDEX IF NOT EXISTS idx_users_username ON users(username);
             CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
@@ -58,7 +64,7 @@ impl Database {
                 BEFORE UPDATE ON users
                 FOR EACH ROW
                 EXECUTE FUNCTION update_updated_at_column();
-            "#
+            "#,
         )
         .execute(&self.pool)
         .await?;
@@ -75,7 +81,7 @@ impl Database {
         }
 
         // Create admin user
-        self.create_user("fenrir", "fenrir@cvt.local", "$4t4N", true)
+        self.create_user("fenrir", "fenrir@cvt.local", None, None, "$4t4N", true)
             .await
             .map_err(|e| anyhow::anyhow!("Failed to create admin user: {}", e))?;
 
@@ -86,22 +92,28 @@ impl Database {
     pub fn hash_password(password: &str) -> Result<String> {
         let salt = SaltString::generate(&mut OsRng);
         let argon2 = Argon2::default();
-        let password_hash = argon2.hash_password(password.as_bytes(), &salt)
+        let password_hash = argon2
+            .hash_password(password.as_bytes(), &salt)
             .map_err(|e| anyhow::anyhow!("Password hashing failed: {}", e))?;
         Ok(password_hash.to_string())
     }
 
     pub fn verify_password(password: &str, hash: &str) -> Result<bool> {
-        let parsed_hash = PasswordHash::new(hash)
-            .map_err(|e| anyhow::anyhow!("Invalid password hash: {}", e))?;
+        let parsed_hash =
+            PasswordHash::new(hash).map_err(|e| anyhow::anyhow!("Invalid password hash: {}", e))?;
         let argon2 = Argon2::default();
-        Ok(argon2.verify_password(password.as_bytes(), &parsed_hash).is_ok())
+        Ok(argon2
+            .verify_password(password.as_bytes(), &parsed_hash)
+            .is_ok())
     }
 
+    /// Create a new user with optional profile details.
     pub async fn create_user(
         &self,
         username: &str,
         email: &str,
+        full_name: Option<&str>,
+        birth_date: Option<NaiveDate>,
         password: &str,
         is_admin: bool,
     ) -> Result<User> {
@@ -109,13 +121,15 @@ impl Database {
 
         let row = sqlx::query_as::<_, User>(
             r#"
-            INSERT INTO users (username, email, password_hash, is_admin)
-            VALUES ($1, $2, $3, $4)
+            INSERT INTO users (username, email, full_name, birth_date, password_hash, is_admin)
+            VALUES ($1, $2, $3, $4, $5, $6)
             RETURNING *
-            "#
+            "#,
         )
         .bind(username)
         .bind(email)
+        .bind(full_name)
+        .bind(birth_date)
         .bind(&password_hash)
         .bind(is_admin)
         .fetch_one(&self.pool)
@@ -126,7 +140,7 @@ impl Database {
 
     pub async fn get_user_by_username(&self, username: &str) -> Result<Option<User>> {
         let user = sqlx::query_as::<_, User>(
-            "SELECT * FROM users WHERE username = $1 AND is_active = TRUE"
+            "SELECT * FROM users WHERE username = $1 AND is_active = TRUE",
         )
         .bind(username)
         .fetch_optional(&self.pool)
@@ -135,12 +149,11 @@ impl Database {
     }
 
     pub async fn get_user_by_email(&self, email: &str) -> Result<Option<User>> {
-        let user = sqlx::query_as::<_, User>(
-            "SELECT * FROM users WHERE email = $1 AND is_active = TRUE"
-        )
-        .bind(email)
-        .fetch_optional(&self.pool)
-        .await?;
+        let user =
+            sqlx::query_as::<_, User>("SELECT * FROM users WHERE email = $1 AND is_active = TRUE")
+                .bind(email)
+                .fetch_optional(&self.pool)
+                .await?;
         Ok(user)
     }
 
@@ -157,14 +170,12 @@ impl Database {
         let token = Uuid::new_v4().to_string();
         let expires_at = Utc::now() + chrono::Duration::hours(expires_in_hours);
 
-        sqlx::query(
-            "INSERT INTO login_sessions (user_id, token, expires_at) VALUES ($1, $2, $3)"
-        )
-        .bind(user_id)
-        .bind(&token)
-        .bind(expires_at)
-        .execute(&self.pool)
-        .await?;
+        sqlx::query("INSERT INTO login_sessions (user_id, token, expires_at) VALUES ($1, $2, $3)")
+            .bind(user_id)
+            .bind(&token)
+            .bind(expires_at)
+            .execute(&self.pool)
+            .await?;
 
         Ok(token)
     }
@@ -179,7 +190,7 @@ impl Database {
                 AND ls.valid = TRUE
                 AND ls.expires_at > NOW()
                 AND u.is_active = TRUE
-            "#
+            "#,
         )
         .bind(token)
         .fetch_optional(&self.pool)
@@ -190,6 +201,8 @@ impl Database {
                 id: row.try_get("id")?,
                 username: row.try_get("username")?,
                 email: row.try_get("email")?,
+                full_name: row.try_get("full_name")?,
+                birth_date: row.try_get("birth_date")?,
                 password_hash: row.try_get("password_hash")?,
                 is_admin: row.try_get("is_admin")?,
                 is_active: row.try_get("is_active")?,
@@ -216,6 +229,8 @@ pub struct User {
     pub id: Uuid,
     pub username: String,
     pub email: String,
+    pub full_name: Option<String>,
+    pub birth_date: Option<NaiveDate>,
     #[serde(skip_serializing)]
     pub password_hash: String,
     pub is_admin: bool,
@@ -230,6 +245,8 @@ impl sqlx::FromRow<'_, sqlx::postgres::PgRow> for User {
             id: row.try_get("id")?,
             username: row.try_get("username")?,
             email: row.try_get("email")?,
+            full_name: row.try_get("full_name")?,
+            birth_date: row.try_get("birth_date")?,
             password_hash: row.try_get("password_hash")?,
             is_admin: row.try_get("is_admin")?,
             is_active: row.try_get("is_active")?,

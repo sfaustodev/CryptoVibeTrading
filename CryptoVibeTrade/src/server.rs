@@ -1,11 +1,12 @@
+use crate::database::{Database, User};
+use chrono::NaiveDate;
 use leptos::*;
 use serde::{Deserialize, Serialize};
-use crate::database::{Database, User};
-use std::sync::Arc;
-use tokio::sync::RwLock;
 use solana_client::rpc_client::RpcClient;
 use solana_sdk::pubkey::Pubkey;
 use std::str::FromStr;
+use std::sync::Arc;
+use tokio::sync::RwLock;
 
 // =====================
 // Shared API types
@@ -41,6 +42,8 @@ pub struct LoginResponse {
 pub struct RegisterRequest {
     pub username: String,
     pub email: String,
+    pub full_name: Option<String>,
+    pub birth_date: Option<String>,
     pub password: String,
 }
 
@@ -88,34 +91,36 @@ fn get_database() -> Result<Arc<Database>, ServerFnError> {
 pub async fn login(username: String, password: String) -> Result<LoginResponse, ServerFnError> {
     // Try database-backed login first
     match get_database() {
-        Ok(db) => {
-            match db.verify_credentials(&username, &password).await {
-                Ok(Some(user)) => {
-                    let token = db.create_session(&user.id, 24).await
-                        .map_err(|e| ServerFnError::new(format!("Session creation failed: {}", e)))?;
+        Ok(db) => match db.verify_credentials(&username, &password).await {
+            Ok(Some(user)) => {
+                let token = db
+                    .create_session(&user.id, 24)
+                    .await
+                    .map_err(|e| ServerFnError::new(format!("Session creation failed: {}", e)))?;
 
-                    Ok(LoginResponse {
-                        success: true,
-                        token: Some(token),
-                        message: format!("Welcome back, {}!", user.username),
-                        is_admin: Some(user.is_admin),
-                    })
-                }
-                Ok(None) => Ok(LoginResponse {
-                    success: false,
-                    token: None,
-                    message: "Invalid username or password".to_string(),
-                    is_admin: None,
-                }),
-                Err(e) => Err(ServerFnError::new(format!("Database error: {}", e))),
+                Ok(LoginResponse {
+                    success: true,
+                    token: Some(token),
+                    message: format!("Welcome back, {}!", user.username),
+                    is_admin: Some(user.is_admin),
+                })
             }
-        }
+            Ok(None) => Ok(LoginResponse {
+                success: false,
+                token: None,
+                message: "Invalid username or password".to_string(),
+                is_admin: None,
+            }),
+            Err(e) => Err(ServerFnError::new(format!("Database error: {}", e))),
+        },
         Err(_) => {
             // Database not available - return helpful error
             Ok(LoginResponse {
                 success: false,
                 token: None,
-                message: "Database not available. Please start PostgreSQL with: docker-compose up -d".to_string(),
+                message:
+                    "Database not available. Please start PostgreSQL with: docker-compose up -d"
+                        .to_string(),
                 is_admin: None,
             })
         }
@@ -126,6 +131,8 @@ pub async fn login(username: String, password: String) -> Result<LoginResponse, 
 pub async fn register_user(
     username: String,
     email: String,
+    full_name: Option<String>,
+    birth_date: Option<String>,
     password: String,
 ) -> Result<RegisterResponse, ServerFnError> {
     let db = get_database()?;
@@ -152,6 +159,21 @@ pub async fn register_user(
         });
     }
 
+    let parsed_birth_date = match birth_date.as_deref() {
+        Some(value) if !value.trim().is_empty() => {
+            match NaiveDate::parse_from_str(value, "%Y-%m-%d") {
+                Ok(date) => Some(date),
+                Err(_) => {
+                    return Ok(RegisterResponse {
+                        success: false,
+                        message: "Birth date must be in YYYY-MM-DD format".to_string(),
+                    });
+                }
+            }
+        }
+        _ => None,
+    };
+
     // Check if user already exists
     if let Ok(Some(_)) = db.get_user_by_username(&username).await {
         return Ok(RegisterResponse {
@@ -168,7 +190,17 @@ pub async fn register_user(
     }
 
     // Create user
-    match db.create_user(&username, &email, &password, false).await {
+    match db
+        .create_user(
+            &username,
+            &email,
+            full_name.as_deref(),
+            parsed_birth_date,
+            &password,
+            false,
+        )
+        .await
+    {
         Ok(_) => Ok(RegisterResponse {
             success: true,
             message: "Registration successful! Please login.".to_string(),
@@ -376,14 +408,10 @@ pub async fn ai_analyze(
 // =====================
 
 #[server(GlmAnalyze, "/api")]
-pub async fn glm_analyze(
-    prompt: String,
-    context: String,
-) -> Result<String, ServerFnError> {
+pub async fn glm_analyze(prompt: String, context: String) -> Result<String, ServerFnError> {
     use std::env;
 
-    let api_key = env::var("GLM_API_KEY")
-        .unwrap_or_else(|_| "demo_key".to_string());
+    let api_key = env::var("GLM_API_KEY").unwrap_or_else(|_| "demo_key".to_string());
 
     if api_key == "demo_key" {
         return Ok(format!(
@@ -475,12 +503,12 @@ pub async fn verify_nft(
         .map_err(|_| ServerFnError::new("Invalid wallet address"))?;
 
     // Parse mint address
-    let mint_pubkey = Pubkey::from_str(&mint_address)
-        .map_err(|_| ServerFnError::new("Invalid mint address"))?;
+    let mint_pubkey =
+        Pubkey::from_str(&mint_address).map_err(|_| ServerFnError::new("Invalid mint address"))?;
 
     // Connect to Solana RPC (using devnet for testing, can be mainnet-beta)
-    let rpc_url = env::var("SOLANA_RPC_URL")
-        .unwrap_or_else(|_| "https://api.devnet.solana.com".to_string());
+    let rpc_url =
+        env::var("SOLANA_RPC_URL").unwrap_or_else(|_| "https://api.devnet.solana.com".to_string());
     let client = RpcClient::new(rpc_url);
 
     // Get the token account for the NFT
@@ -507,12 +535,8 @@ pub async fn verify_nft(
             // For demo purposes, if RPC fails, allow access with warning
             Ok(VerifyNftResponse {
                 is_holder: true,
-                message: format!(
-                    "RPC verification failed (using demo mode). Error: {:?}",
-                    e
-                ),
+                message: format!("RPC verification failed (using demo mode). Error: {:?}", e),
             })
         }
     }
 }
-

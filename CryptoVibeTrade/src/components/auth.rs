@@ -1,13 +1,15 @@
+use crate::server::{login, register_user};
 use leptos::*;
 use leptos_meta::*;
 use leptos_router::*;
-use crate::server::{register_user, login};
 
 #[component]
 pub fn RegisterPage() -> impl IntoView {
     let navigate = use_navigate();
+    let (full_name, set_full_name) = create_signal(String::new());
     let (username, set_username) = create_signal(String::new());
     let (email, set_email) = create_signal(String::new());
+    let (birth_date, set_birth_date) = create_signal(String::new());
     let (password, set_password) = create_signal(String::new());
     let (confirm_password, set_confirm_password) = create_signal(String::new());
     let (error, set_error) = create_signal(String::new());
@@ -15,12 +17,19 @@ pub fn RegisterPage() -> impl IntoView {
     let (is_loading, set_is_loading) = create_signal(false);
 
     let handle_register = move |_| {
+        let full_name_val = full_name.get();
         let username_val = username.get();
         let email_val = email.get();
+        let birth_date_val = birth_date.get();
         let password_val = password.get();
         let confirm_val = confirm_password.get();
 
         // Validation
+        if full_name_val.trim().is_empty() {
+            set_error.set("Full name is required".to_string());
+            return;
+        }
+
         if username_val.len() < 3 {
             set_error.set("Username must be at least 3 characters".to_string());
             return;
@@ -42,7 +51,22 @@ pub fn RegisterPage() -> impl IntoView {
 
         let navigate = navigate.clone();
         spawn_local(async move {
-            match register_user(username_val, email_val, password_val).await {
+            let full_name_value = full_name_val.trim().to_string();
+            let birth_date_value = birth_date_val.trim().to_string();
+            let birth_date_payload = if birth_date_value.is_empty() {
+                None
+            } else {
+                Some(birth_date_value)
+            };
+            match register_user(
+                username_val,
+                email_val,
+                Some(full_name_value),
+                birth_date_payload,
+                password_val,
+            )
+            .await
+            {
                 Ok(response) => {
                     if response.success {
                         set_success.set(response.message);
@@ -200,6 +224,74 @@ pub fn RegisterPage() -> impl IntoView {
             .login-link a:hover {
                 text-decoration: underline;
             }
+
+            .social-section {
+                margin-top: 24px;
+                display: flex;
+                flex-direction: column;
+                gap: 12px;
+            }
+
+            .social-divider {
+                display: flex;
+                align-items: center;
+                gap: 12px;
+                color: #666;
+                font-size: 10px;
+                letter-spacing: 0.25em;
+                text-transform: uppercase;
+                margin-top: 16px;
+            }
+
+            .social-divider::before,
+            .social-divider::after {
+                content: "";
+                flex: 1;
+                height: 1px;
+                background: #222;
+            }
+
+            .social-btn {
+                width: 100%;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                gap: 10px;
+                padding: 12px 16px;
+                border-radius: 10px;
+                border: 1px solid #2a2a2a;
+                background: rgba(0, 0, 0, 0.6);
+                color: #fff;
+                font-family: inherit;
+                font-size: 12px;
+                letter-spacing: 0.12em;
+                text-transform: uppercase;
+                cursor: pointer;
+                transition: all 0.3s;
+            }
+
+            .social-btn:hover {
+                border-color: var(--neon-orange);
+                box-shadow: 0 0 18px rgba(255, 107, 53, 0.3);
+                transform: translateY(-1px);
+            }
+
+            .social-icon {
+                width: 18px;
+                height: 18px;
+                display: inline-flex;
+                align-items: center;
+                justify-content: center;
+                border-radius: 50%;
+                font-weight: 700;
+                background: #111;
+                color: #fff;
+                font-size: 12px;
+            }
+
+            .social-icon.apple {
+                font-size: 14px;
+            }
         "#}</Style>
 
         <div class="register-container">
@@ -207,59 +299,122 @@ pub fn RegisterPage() -> impl IntoView {
                 <div class="register-title">"Join CVT"</div>
                 <div class="register-subtitle">"Create Your Account"</div>
 
-                <div class="form-group">
-                    <label>"Username"</label>
-                    <input
-                        type="text"
-                        prop:value=username
-                        on:input=move |ev| set_username.set(event_target_value(&ev))
-                        placeholder="Choose a username"
-                        minlength=3
-                    />
-                </div>
-
-                <div class="form-group">
-                    <label>"Email"</label>
-                    <input
-                        type="email"
-                        prop:value=email
-                        on:input=move |ev| set_email.set(event_target_value(&ev))
-                        placeholder="your@email.com"
-                    />
-                </div>
-
-                <div class="form-group">
-                    <label>"Password"</label>
-                    <input
-                        type="password"
-                        prop:value=password
-                        on:input=move |ev| set_password.set(event_target_value(&ev))
-                        placeholder="Min 8 characters"
-                        minlength=8
-                    />
-                </div>
-
-                <div class="form-group">
-                    <label>"Confirm Password"</label>
-                    <input
-                        type="password"
-                        prop:value=confirm_password
-                        on:input=move |ev| set_confirm_password.set(event_target_value(&ev))
-                        placeholder="Confirm password"
-                    />
-                </div>
-
-                <div class="error-msg">{move || error.get()}</div>
-                <div class="success-msg">{move || success.get()}</div>
-
-                <button
-                    class="btn btn-primary"
-                    style="margin-top:16px;"
-                    on:click=handle_register
-                    disabled=is_loading
+                <form
+                    on:submit=move |ev| {
+                        ev.prevent_default();
+                        handle_register(());
+                    }
                 >
-                    {move || if is_loading.get() { "Creating Account..." } else { "Register" }}
-                </button>
+                    <div class="form-group">
+                        <label>"Full Name"</label>
+                        <input
+                            type="text"
+                            prop:value=full_name
+                            on:input=move |ev| set_full_name.set(event_target_value(&ev))
+                            placeholder="Enter your full name"
+                        />
+                    </div>
+
+                    <div class="form-group">
+                        <label>"Username"</label>
+                        <input
+                            type="text"
+                            prop:value=username
+                            on:input=move |ev| set_username.set(event_target_value(&ev))
+                            placeholder="Choose a username"
+                            minlength=3
+                        />
+                    </div>
+
+                    <div class="form-group">
+                        <label>"Email"</label>
+                        <input
+                            type="email"
+                            prop:value=email
+                            on:input=move |ev| set_email.set(event_target_value(&ev))
+                            placeholder="your@email.com"
+                        />
+                    </div>
+
+                    <div class="form-group">
+                        <label>"Birth Date"</label>
+                        <input
+                            type="date"
+                            prop:value=birth_date
+                            on:input=move |ev| set_birth_date.set(event_target_value(&ev))
+                        />
+                    </div>
+
+                    <div class="form-group">
+                        <label>"Password"</label>
+                        <input
+                            type="password"
+                            prop:value=password
+                            on:input=move |ev| set_password.set(event_target_value(&ev))
+                            placeholder="Min 8 characters"
+                            minlength=8
+                        />
+                    </div>
+
+                    <div class="form-group">
+                        <label>"Confirm Password"</label>
+                        <input
+                            type="password"
+                            prop:value=confirm_password
+                            on:input=move |ev| set_confirm_password.set(event_target_value(&ev))
+                            placeholder="Confirm password"
+                        />
+                    </div>
+
+                    <div class="error-msg">{move || error.get()}</div>
+                    <div class="success-msg">{move || success.get()}</div>
+
+                    <button
+                        class="btn btn-primary"
+                        style="margin-top:16px;"
+                        type="submit"
+                        disabled=is_loading
+                    >
+                        {move || if is_loading.get() { "Creating Account..." } else { "Register" }}
+                    </button>
+                </form>
+
+                <div class="social-divider">"Or register with"</div>
+                <div class="social-section">
+                    <button
+                        class="social-btn"
+                        type="button"
+                        on:click=move |_| {
+                            set_error.set("Google registration is coming soon.".to_string());
+                            set_success.set(String::new());
+                        }
+                    >
+                        <span class="social-icon">"G"</span>
+                        "Continue with Google"
+                    </button>
+                    <button
+                        class="social-btn"
+                        type="button"
+                        on:click=move |_| {
+                            set_error.set("Apple registration is coming soon.".to_string());
+                            set_success.set(String::new());
+                        }
+                    >
+                        <span class="social-icon apple">""</span>
+                        "Continue with Apple"
+                    </button>
+                    <button
+                        class="social-btn"
+                        type="button"
+                        on:click=move |_| {
+                            set_error.set("X registration is coming soon.".to_string());
+                            set_success.set(String::new());
+                        }
+                    >
+                        <span class="social-icon">"X"</span>
+                        "Continue with X"
+                    </button>
+                </div>
 
                 <div class="login-link">
                     "Already have an account? "
@@ -297,6 +452,7 @@ pub fn LoginPage() -> impl IntoView {
                 match login(username_val, password_val).await {
                     Ok(response) => {
                         if response.success {
+                            set_is_loading.set(false);
                             if response.is_admin.unwrap_or(false) {
                                 navigate(&"/admin/dashboard".to_string(), Default::default());
                             } else {
@@ -444,6 +600,74 @@ pub fn LoginPage() -> impl IntoView {
             .register-link a:hover {
                 text-decoration: underline;
             }
+
+            .social-section {
+                margin-top: 24px;
+                display: flex;
+                flex-direction: column;
+                gap: 12px;
+            }
+
+            .social-divider {
+                display: flex;
+                align-items: center;
+                gap: 12px;
+                color: #666;
+                font-size: 10px;
+                letter-spacing: 0.25em;
+                text-transform: uppercase;
+                margin-top: 16px;
+            }
+
+            .social-divider::before,
+            .social-divider::after {
+                content: "";
+                flex: 1;
+                height: 1px;
+                background: #222;
+            }
+
+            .social-btn {
+                width: 100%;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                gap: 10px;
+                padding: 12px 16px;
+                border-radius: 10px;
+                border: 1px solid #2a2a2a;
+                background: rgba(0, 0, 0, 0.6);
+                color: #fff;
+                font-family: inherit;
+                font-size: 12px;
+                letter-spacing: 0.12em;
+                text-transform: uppercase;
+                cursor: pointer;
+                transition: all 0.3s;
+            }
+
+            .social-btn:hover {
+                border-color: var(--neon-orange);
+                box-shadow: 0 0 18px rgba(255, 107, 53, 0.3);
+                transform: translateY(-1px);
+            }
+
+            .social-icon {
+                width: 18px;
+                height: 18px;
+                display: inline-flex;
+                align-items: center;
+                justify-content: center;
+                border-radius: 50%;
+                font-weight: 700;
+                background: #111;
+                color: #fff;
+                font-size: 12px;
+            }
+
+            .social-icon.apple {
+                font-size: 14px;
+            }
         "#}</Style>
 
         <div class="login-container">
@@ -451,52 +675,71 @@ pub fn LoginPage() -> impl IntoView {
                 <div class="login-title">"Welcome Back"</div>
                 <div class="login-subtitle">"Login to Your Account"</div>
 
-                <div class="form-group">
-                    <label>"Username"</label>
-                    <input
-                        type="text"
-                        prop:value=username
-                        on:input=move |ev| set_username.set(event_target_value(&ev))
-                        placeholder="Enter username"
-                        on:keydown={
-                            let handle_login = handle_login.clone();
-                            move |ev| {
-                                if ev.key() == "Enter" {
-                                    handle_login(());
-                                }
-                            }
-                        }
-                    />
-                </div>
-
-                <div class="form-group">
-                    <label>"Password"</label>
-                    <input
-                        type="password"
-                        prop:value=password
-                        on:input=move |ev| set_password.set(event_target_value(&ev))
-                        placeholder="Enter password"
-                        on:keydown={
-                            let handle_login = handle_login.clone();
-                            move |ev| {
-                                if ev.key() == "Enter" {
-                                    handle_login(());
-                                }
-                            }
-                        }
-                    />
-                </div>
-
-                <div class="error-msg">{move || error.get()}</div>
-
-                <button
-                    class="btn btn-primary"
-                    style="margin-top:16px;"
-                    on:click=move |_| handle_login(())
-                    disabled=is_loading
+                <form
+                    on:submit=move |ev| {
+                        ev.prevent_default();
+                        handle_login(());
+                    }
                 >
-                    {move || if is_loading.get() { "Authenticating..." } else { "Login" }}
-                </button>
+                    <div class="form-group">
+                        <label>"Username"</label>
+                        <input
+                            type="text"
+                            prop:value=username
+                            on:input=move |ev| set_username.set(event_target_value(&ev))
+                            placeholder="Enter username"
+                        />
+                    </div>
+
+                    <div class="form-group">
+                        <label>"Password"</label>
+                        <input
+                            type="password"
+                            prop:value=password
+                            on:input=move |ev| set_password.set(event_target_value(&ev))
+                            placeholder="Enter password"
+                        />
+                    </div>
+
+                    <div class="error-msg">{move || error.get()}</div>
+
+                    <button
+                        class="btn btn-primary"
+                        style="margin-top:16px;"
+                        type="submit"
+                        disabled=is_loading
+                    >
+                        {move || if is_loading.get() { "Authenticating..." } else { "Login" }}
+                    </button>
+                </form>
+
+                <div class="social-divider">"Or login with"</div>
+                <div class="social-section">
+                    <button
+                        class="social-btn"
+                        type="button"
+                        on:click=move |_| set_error.set("Google login is coming soon.".to_string())
+                    >
+                        <span class="social-icon">"G"</span>
+                        "Continue with Google"
+                    </button>
+                    <button
+                        class="social-btn"
+                        type="button"
+                        on:click=move |_| set_error.set("Apple login is coming soon.".to_string())
+                    >
+                        <span class="social-icon apple">""</span>
+                        "Continue with Apple"
+                    </button>
+                    <button
+                        class="social-btn"
+                        type="button"
+                        on:click=move |_| set_error.set("X login is coming soon.".to_string())
+                    >
+                        <span class="social-icon">"X"</span>
+                        "Continue with X"
+                    </button>
+                </div>
 
                 <div class="register-link">
                     "Don't have an account? "
